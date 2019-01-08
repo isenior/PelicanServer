@@ -298,7 +298,7 @@ void Mob::MakePoweredPet(uint16 spell_id, const char* pettype, int16 petpower,
 		strcat(npc_type->name, "`s_pet");
 	}
 
-	//handle beastlord pet appearance // CUSTOM
+	//handle beastlord pet appearance // CUSTOM 
 	if(record.petnaming == 2)
 	{
 		switch(GetBaseRace())

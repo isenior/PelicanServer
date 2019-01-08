@@ -415,7 +415,7 @@ bool Mob::AvoidDamage(Mob *other, DamageHitInfo &hit)
 			int slip = aabonuses.OffhandRiposteFail + itembonuses.OffhandRiposteFail + spellbonuses.OffhandRiposteFail;
 			chance += chance * slip / 100;
 		}
-		chance = mod_riposte_chance(chance, attacker); // CUSTOM
+		chance = mod_riposte_chance(chance, attacker); // CUSTOM 
 		if (chance > 0 && zone->random.Roll(chance)) { // could be <0 from offhand stuff
 			hit.damage_done = DMG_RIPOSTED;
 			return true;

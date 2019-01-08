@@ -3492,7 +3492,7 @@ void Mob::DoBuffTic(const Buffs_Struct &buff, int slot, Mob *caster)
 			break;
 		}
 		case SE_HealOverTime: {
-			// CUSTOM 
+			// CUSTOM
 			if (caster)
 			{
 				effect_value = CalcSpellEffectValue(buff.spellid, i, buff.casterlevel, buff.instrument_mod, caster);

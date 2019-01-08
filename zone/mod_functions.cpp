@@ -41,7 +41,7 @@ void NPC::mod_npc_killed_merit(Mob* c) { return; }
 void NPC::mod_npc_killed(Mob* oos) { return; }
 
 //Base damage from Client::Attack - can cover myriad skill types
-// CUSTOM
+// CUSTOM 
 int Client::mod_client_damage(int damage, EQEmu::skills::SkillType skillinuse, int hand, const EQEmu::ItemInstance* weapon, Mob* other) 
 { 
 	if (isDebug) { Message(0,"Modding Melee Damage: %i", damage);}

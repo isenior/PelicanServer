@@ -190,7 +190,7 @@ void Mob::DoSpecialAttackDamage(Mob *who, EQEmu::skills::SkillType skill, int32 
 	if (skill == EQEmu::skills::SkillThrowing || skill == EQEmu::skills::SkillArchery)
 		my_hit.hand = EQEmu::invslot::slotRange;
 	
-	// CUSTOM 
+	// CUSTOM
 	switch (skill)
 	{
 		case EQEmu::skills::SkillKick:
