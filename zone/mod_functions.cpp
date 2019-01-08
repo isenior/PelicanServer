@@ -278,7 +278,7 @@ int Mob::mod_effect_value(int effect_value, uint16 spell_id, int effect_type, Mo
 float Mob::mod_hit_chance(float chancetohit, EQEmu::skills::SkillType skillinuse, Mob* attacker) { return(chancetohit); }
 
 //Final riposte chance
-// CUSTOM
+// CUSTOM 
 float Mob::mod_riposte_chance(float ripostechance, Mob* attacker) 
 { 
 	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
