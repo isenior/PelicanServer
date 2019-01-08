@@ -1571,10 +1571,8 @@ void Mob::ApplySpellsBonuses(uint16 spell_id, uint8 casterlevel, StatBonuses *ne
 {
 	int i, effect_value, base2, max, effectid;
 	bool AdditiveWornBonus = false;
-
 	if(!IsAISpellEffect && !IsValidSpell(spell_id))
 		return;
-
 	for (i = 0; i < EFFECT_COUNT; i++)
 	{
 		//Buffs/Item effects
@@ -1613,7 +1611,6 @@ void Mob::ApplySpellsBonuses(uint16 spell_id, uint8 casterlevel, StatBonuses *ne
 			max = se_max;
 			i = EFFECT_COUNT; //End the loop
 		}
-
 		switch (effectid)
 		{
 			case SE_CurrentHP: //regens
@@ -1929,7 +1926,6 @@ void Mob::ApplySpellsBonuses(uint16 spell_id, uint8 casterlevel, StatBonuses *ne
 					new_bonus->DamageShieldType = GetDamageShieldType(spell_id, max);
 				else
 					new_bonus->DamageShieldType = GetDamageShieldType(spell_id);
-
 				break;
 			}
 

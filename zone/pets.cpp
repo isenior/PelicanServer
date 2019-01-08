@@ -327,6 +327,48 @@ void Mob::MakePoweredPet(uint16 spell_id, const char* pettype, int16 petpower,
 			npc_type->size *= 2.0f;
 			npc_type->luclinface = 0;
 			break;
+		case HUMAN:
+			npc_type->race = RACE_BEETLE_22;
+			break;
+		case ERUDITE:
+			npc_type->race = RACE_KERRAN_23;
+			npc_type->gender = 0;
+			break;
+		case WOOD_ELF:
+			npc_type->race = RACE_WASP_109;
+			break;
+		case HIGH_ELF:
+			npc_type->race = RACE_GIANT_BAT_34;
+			npc_type->size *= 0.5f;
+			break;
+		case DARK_ELF:
+			npc_type->race = RACE_GIANT_SPIDER_38;
+			npc_type->texture = 1;
+			break;
+		case HALF_ELF:
+			npc_type->race = RACE_PUMA_76;
+			npc_type->size *= 1.5f;
+			break;
+		case DWARF:
+			npc_type->race = RACE_AVIAK_558;
+			npc_type->texture = 1;
+			npc_type->size *= 1.3f;
+			break;
+		case HALFLING:
+			npc_type->race = RACE_BIXIE_79;
+			npc_type->size *= 0.8f;
+			break;
+		case GNOME:
+			npc_type->race = RACE_GIANT_SPIDER_38;
+			npc_type->texture = 3;
+			break;
+		case DRAKKIN:
+			npc_type->race = RACE_DRAKE_89;
+			npc_type->texture = 1;
+			break;
+		case FROGLOK:
+			npc_type->race = RACE_FROGLOK_TADPOLE_102;
+			break;
 		default:
 			npc_type->race = WOLF;
 			npc_type->texture = 0;
