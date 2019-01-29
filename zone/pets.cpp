@@ -350,9 +350,8 @@ void Mob::MakePoweredPet(uint16 spell_id, const char* pettype, int16 petpower,
 			npc_type->size *= 1.5f;
 			break;
 		case DWARF:
-			npc_type->race = RACE_AVIAK_558;
-			npc_type->texture = 1;
-			npc_type->size *= 1.3f;
+			npc_type->race = RACE_BEETLE_22;
+			npc_type->texture = 3;
 			break;
 		case HALFLING:
 			npc_type->race = RACE_BIXIE_79;
