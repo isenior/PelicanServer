@@ -323,7 +323,8 @@ bool Mob::CheckWillAggro(Mob *mob) {
 	if (RuleB(Aggro, UseLevelAggro))
 	{
 		//old InZone check taken care of above by !mob->CastToClient()->Connected()
-		if (
+		if 
+		(
 			(   
 				( GetLevel() >= RuleI(Aggro, MinAggroLevel))
 				||(GetBodyType() == 3)
