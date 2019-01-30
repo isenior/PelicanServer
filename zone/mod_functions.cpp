@@ -151,6 +151,18 @@ int Client::mod_drink_value(const EQEmu::ItemData *item, int change) { return(ch
 int Mob::mod_effect_value(int effect_value, uint16 spell_id, int effect_type, Mob* caster, uint16 caster_id) 
 { 
 	int bard_bonus = 0;
+	bool bard_song = false;
+	
+	// Sometimes, the caster_id is passed but not the mob (Mainly bonuses like regen spells and DS)
+	if (caster == nullptr && caster_id > 0)
+	{
+		bard_song = IsBardSong(spell_id);
+		if (bard_song)
+		{
+			// We really only want the caster if this is a song; otherwise, the bonus is based off of the client
+			caster = entity_list.GetMob(caster_id);
+		}
+	}
 	
 	if (isDebug)
 	{
