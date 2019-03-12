@@ -956,6 +956,8 @@ void Mob::MeleeMitigation(Mob *attacker, DamageHitInfo &hit, ExtraAttackOptions 
 
 	Mob* defender = this;
 	auto mitigation = defender->GetMitigationAC();
+	
+	mitigation = mod_mitigation_rating(mitigation, attacker); // CUSTOM
 	if (IsClient() && attacker->IsClient())
 		mitigation = mitigation * 80 / 100; // 2004 PvP changes
 

@@ -151,16 +151,21 @@ int Client::mod_drink_value(const EQEmu::ItemData *item, int change) { return(ch
 int Mob::mod_effect_value(int effect_value, uint16 spell_id, int effect_type, Mob* caster, uint16 caster_id) 
 { 
 	int bard_bonus = 0;
-	bool bard_song = false;
 	
-	// Sometimes, the caster_id is passed but not the mob (Mainly bonuses like regen spells and DS)
-	if (caster == nullptr && caster_id > 0)
+	// We really only want the caster if this is a song; otherwise, the bonus is based off of the client
+	if (IsBardSong(spell_id))
 	{
-		bard_song = IsBardSong(spell_id);
-		if (bard_song)
+		// Sometimes, the caster_id is passed but not the mob (Mainly bonuses like regen spells and DS)
+		if (caster == nullptr && caster_id > 0)
 		{
-			// We really only want the caster if this is a song; otherwise, the bonus is based off of the client
 			caster = entity_list.GetMob(caster_id);
+		}
+		
+		if (caster && caster->GetClass() == BARD) // Bards are special
+		{
+			bard_bonus = (GetCHA() + GetDEX() - 160)/10;
+			if (bard_bonus < 0) { bard_bonus = 0;}
+			caster->Message(0,"You're a bard! Bonus: %i", bard_bonus);
 		}
 	}
 	
@@ -217,12 +222,6 @@ int Mob::mod_effect_value(int effect_value, uint16 spell_id, int effect_type, Mo
 	// Spell effects that require a caster
 	if (caster && (caster->IsClient() || (caster->IsPet() && caster->GetOwner() && caster->GetOwner()->IsClient())))
 	{		
-		if (caster->GetClass() == BARD) // Bards are special
-		{
-			bard_bonus = (GetCHA() + GetDEX() - 160)/10;
-			if (bard_bonus < 0) { bard_bonus = 0;}
-			caster->Message(0,"You're a bard! Bonus: %i", bard_bonus);
-		}
 		// Damage or healing spell
 		if (effect_type == SE_BardAEDot || effect_type == SE_CompleteHeal ||
 			effect_type == SE_CurrentHP || effect_type == SE_CurrentHPOnce || effect_type == SE_HealOverTime)
