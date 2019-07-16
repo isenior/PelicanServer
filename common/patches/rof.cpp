@@ -2126,14 +2126,25 @@ namespace RoF
 
 		outapp->WriteUInt32(spells::SPELLBOOK_SIZE);		// Spellbook slots
 
-		for (uint32 r = 0; r < EQEmu::spells::SPELLBOOK_SIZE; r++)
-		{
-			outapp->WriteUInt32(emu->spell_book[r]);
+		if (spells::SPELLBOOK_SIZE <= EQEmu::spells::SPELLBOOK_SIZE) {
+			for (uint32 r = 0; r < spells::SPELLBOOK_SIZE; r++) {
+				if (emu->spell_book[r] <= spells::SPELL_ID_MAX)
+					outapp->WriteUInt32(emu->spell_book[r]);
+				else
+					outapp->WriteUInt32(0xFFFFFFFFU);
+			}
 		}
-		// zeroes for the rest of the spellbook slots
-		for (uint32 r = 0; r < spells::SPELLBOOK_SIZE - EQEmu::spells::SPELLBOOK_SIZE; r++)
-		{
-			outapp->WriteUInt32(0xFFFFFFFFU);
+		else {
+			for (uint32 r = 0; r < EQEmu::spells::SPELLBOOK_SIZE; r++) {
+				if (emu->spell_book[r] <= spells::SPELL_ID_MAX)
+					outapp->WriteUInt32(emu->spell_book[r]);
+				else
+					outapp->WriteUInt32(0xFFFFFFFFU);
+			}
+			// invalidate the rest of the spellbook slots
+			for (uint32 r = EQEmu::spells::SPELLBOOK_SIZE; r < spells::SPELLBOOK_SIZE; r++) {
+				outapp->WriteUInt32(0xFFFFFFFFU);
+			}
 		}
 
 		outapp->WriteUInt32(spells::SPELL_GEM_COUNT);		// Memorised spell slots
@@ -3191,14 +3202,18 @@ namespace RoF
 		SpecialMesg_Struct *emu = (SpecialMesg_Struct *)in->pBuffer;
 
 		unsigned char *__emu_buffer = in->pBuffer;
+		// break strlen optimizations!
+		char *message = emu->sayer;
+		auto sayer_length = std::char_traits<char>::length(message);
+		message += sayer_length + 1 + 12; // skip over sayer name, null term, and 3 floats
 
-		std::string old_message = &emu->message[strlen(emu->sayer)];
+		std::string old_message = message;
 		std::string new_message;
 
 		ServerToRoFSayLink(new_message, old_message);
 
 		//in->size = 3 + 4 + 4 + strlen(emu->sayer) + 1 + 12 + new_message.length() + 1;
-		in->size = strlen(emu->sayer) + new_message.length() + 25;
+		in->size = sayer_length + new_message.length() + 25;
 		in->pBuffer = new unsigned char[in->size];
 
 		char *OutBuffer = (char *)in->pBuffer;
@@ -3212,18 +3227,10 @@ namespace RoF
 
 		VARSTRUCT_ENCODE_STRING(OutBuffer, emu->sayer);
 
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[0]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[1]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[2]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[3]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[4]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[5]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[6]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[7]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[8]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[9]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[10]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[11]);
+		// TODO: figure this shit out
+		VARSTRUCT_ENCODE_TYPE(float, OutBuffer, 0.0f);
+		VARSTRUCT_ENCODE_TYPE(float, OutBuffer, 0.0f);
+		VARSTRUCT_ENCODE_TYPE(float, OutBuffer, 0.0f);
 
 		VARSTRUCT_ENCODE_STRING(OutBuffer, new_message.c_str());
 

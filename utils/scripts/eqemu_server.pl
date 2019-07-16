@@ -401,6 +401,9 @@ sub build_linux_source {
     mkdir($source_dir . "/Server/build") if (!-e $source_dir . "/Server/build");
     chdir($source_dir . "/Server/build");
 
+    print `git submodule init`;
+    print `git submodule update`;
+
     print "Generating CMake build files...\n";
     if ($os_flavor eq "fedora_core") {
         print `cmake $cmake_options -DEQEMU_BUILD_LOGIN=ON -DEQEMU_BUILD_LUA=ON -DLUA_INCLUDE_DIR=/usr/include/lua-5.1/ -G "Unix Makefiles" ..`;
@@ -637,13 +640,21 @@ sub do_self_update_check_routine {
                     if ($OS eq "Linux") {
                         system("chmod 755 eqemu_server.pl");
                     }
-                    system("perl eqemu_server.pl start_from_world");
+                    exec("perl eqemu_server.pl ran_from_world");
                 }
             }
             print "[Install] Done\n";
         }
         else {
             print "[Update] No script update necessary...\n";
+
+            if (-e "db_update") {
+                unlink("db_update");
+            }
+
+            if (-e "updates_staged") {
+                unlink("updates_staged");
+            }
         }
 
         unlink("updates_staged/eqemu_server.pl");
@@ -787,6 +798,7 @@ sub show_menu_prompt {
         elsif ($input eq "conversions") {
             print "\n>>> Conversions Menu\n\n";
             print " [quest_heading_convert] Converts old heading format in quest scripts to new (live format)\n";
+            print " [quest_faction_convert] Converts to new faction values imported from client\n";
             print " \n> main - go back to main menu\n";
             print "Enter a command #> ";
             $last_menu = trim($input);
@@ -803,7 +815,8 @@ sub show_menu_prompt {
                 print ">>> Windows\n";
                 print " [windows_server_download]	Updates server via latest 'stable' code\n";
                 print " [windows_server_latest]	Updates server via latest commit 'unstable'\n";
-                print " [windows_server_download_bots]	Updates server (bots) from latest 'stable'\n";
+                print " [windows_server_download_bots]	Updates server (bots) via latest 'stable'\n";
+                print " [windows_server_latest_bots]	Updates server (bots) via latest commit 'unstable'\n";
                 print " [fetch_dlls]			Grabs dll's needed to run windows binaries\n";
                 print " [setup_loginserver]		Sets up loginserver for Windows\n";
             }
@@ -867,6 +880,10 @@ sub show_menu_prompt {
             fetch_latest_windows_binaries_bots();
             $dc = 1;
         }
+        elsif ($input eq "windows_server_latest_bots") {
+            fetch_latest_windows_appveyor_bots();
+            $dc = 1;
+        }
         elsif ($input eq "fetch_dlls") {
             fetch_server_dlls();
             $dc = 1;
@@ -903,6 +920,10 @@ sub show_menu_prompt {
         }
         elsif ($input eq "quest_heading_convert") {
             quest_heading_convert();
+            $dc = 1;
+        }
+        elsif ($input eq "quest_faction_convert") {
+            quest_faction_convert();
             $dc = 1;
         }
         elsif ($input eq "source_peq_db") {
@@ -1387,9 +1408,34 @@ sub fetch_latest_windows_binaries {
     rmtree('updates_staged');
 }
 
+sub fetch_latest_windows_appveyor_bots {
+    print "[Update] Fetching Latest Windows Binaries with Bots (unstable) from Appveyor... \n";
+    get_remote_file("https://ci.appveyor.com/api/projects/KimLS/server/artifacts/eqemu-x86-bots.zip", "updates_staged/eqemu-x86-bots.zip", 1);
+
+    print "[Update] Fetched Latest Windows Binaries (unstable) from Appveyor... \n";
+    print "[Update] Extracting... --- \n";
+    unzip('updates_staged/eqemu-x86-bots.zip', 'updates_staged/binaries/');
+    my @files;
+    my $start_dir = "updates_staged/binaries";
+    find(
+        sub { push @files, $File::Find::name unless -d; },
+        $start_dir
+    );
+    for my $file (@files) {
+        $destination_file = $file;
+        $destination_file =~ s/updates_staged\/binaries\///g;
+        print "[Update] Installing :: " . $destination_file . "\n";
+        copy_file($file, $destination_file);
+    }
+    print "[Update] Done\n";
+
+    rmtree('updates_staged');
+}
+
 sub fetch_latest_windows_binaries_bots {
     print "[Update] Fetching Latest Windows Binaries with Bots...\n";
     get_remote_file($install_repository_request_url . "master_windows_build_bots.zip", "updates_staged/master_windows_build_bots.zip", 1);
+
     print "[Update] Fetched Latest Windows Binaries with Bots...\n";
     print "[Update] Extracting...\n";
     unzip('updates_staged/master_windows_build_bots.zip', 'updates_staged/binaries/');
@@ -2209,6 +2255,10 @@ sub run_database_check {
             if ($bots_db_management == 1 && $val == 9000) {
                 modify_db_for_bots();
             }
+
+            if ($val == 9138) {
+                fix_quest_factions();
+            }
         }
         $db_run_stage = 2;
     }
@@ -2492,4 +2542,128 @@ sub quest_heading_convert {
     print get_mysql_result("INSERT INTO `variables` (varname, value, information, ts) VALUES ('new_heading_conversion', 'true', 'Script ran against quests folder to convert new heading values', NOW())");
 
     print "Total matches: " . $total_matches . "\n";
+}
+
+
+sub quest_faction_convert {
+
+	if(trim(get_mysql_result("SELECT value FROM variables WHERE varname = 'new_faction_conversion'")) eq "true") {
+	 	print "Conversion script has already ran... doing this again would skew proper faction values in function calls...\n";
+	 	exit;
+	 }
+
+	%matches = (
+		0 => [ "GetCharacterFactionLevel", 0],
+		1 => [ "GetModCharacterFactionLevel", 0],
+		2 => [ "SetFactionLevel2", 1],
+		3 => [ "GetFactionLevel", 5 ],
+		4 => [ "CheckNPCFactionAlly", 0 ],
+		5 => [ ":Faction", 0 ],
+	);
+
+	$total_matches = 0;
+
+	use Scalar::Util qw(looks_like_number);
+
+	my @files;
+	my $start_dir = "quests/.";
+	find(
+		sub {push @files, $File::Find::name unless -d;},
+		$start_dir
+	);
+	for my $file (@files) {
+
+		#::: Skip non script files
+		if ($file !~ /lua|pl/i) {
+			next;
+		}
+
+		if ($file =~ /lua|pl/i) {
+			$print_buffer = "";
+			$changes_made = 0;
+
+			#::: Open and read line by line
+			open(FILE, $file);
+			while (<FILE>) {
+				chomp;
+				$line = $_;
+
+				#::: Loop through matches
+				foreach my $key (sort (keys %matches)) {
+					$argument_position = $matches{$key}[1];
+					$match             = $matches{$key}[0];
+
+					if ($line =~ /$match\(/i || $line =~ /$match \(/i) {
+						$line_temp =  $line;
+						$line_temp =~ s/^.*$match\(//gi;
+						$line_temp =~ s/^.*$match \(//gi;
+						$line_temp =~ s/"//g;
+						$line_temp =~ s/\);.*//;
+
+						@line_data = split(",", $line_temp);
+
+						$faction_value        = $line_data[$argument_position];
+						$faction_value_clean  = trim($faction_value);
+
+						if (looks_like_number($faction_value_clean)) {
+							$new_faction = get_mysql_result("select clientid from client_server_faction_map where serverid = $faction_value_clean");
+							chomp $new_faction;
+							if ($new_faction == 0) {
+								$new_faction = get_mysql_result("select new_faction from custom_faction_mappings where old_faction = $faction_value_clean");
+								chomp $new_faction;
+							}
+							if ($new_faction > 0) {
+								print "BEFORE: " . $line . "\n";
+								$line =~ s/$faction_value_clean/$new_faction/g;
+								print "AFTER: " . $line . "\n";
+								$changes_made = 1;	
+							}
+							else {
+								print "Unknown Faction: '$match' FACTION VALUE: '" . $faction_value_clean . "'\n";
+							}
+						}
+
+						$total_matches++;
+					}
+				}
+
+				$print_buffer .= $line . "\n";
+			}
+			close(FILE);
+
+			#::: Write changes
+			if ($changes_made == 1) {
+				open(NEW_FILE, '>', $file);
+			 	print NEW_FILE $print_buffer;
+			 	close NEW_FILE;
+			}
+		}
+	}
+
+	#::: Mark conversion as ran
+	print get_mysql_result("INSERT INTO `variables` (varname, value, information, ts) VALUES ('new_faction_conversion', 'true', 'Script ran against quests folder to convert new faction values', NOW())");
+
+	print "Total matches: " . $total_matches . "\n";
+}
+
+sub fix_quest_factions {
+	# Backup the quests
+	mkdir('backups');
+	my @files;
+	my $start_dir = "quests/";
+	find(
+		sub { push @files, $File::Find::name unless -d; },
+		$start_dir
+	);
+	for my $file (@files) {
+		$destination_file = $file;
+		my $date = strftime "%m-%d-%Y", localtime;
+		$destination_file =~ s/quests/quests-$date/;
+		print "Backing up :: " . $destination_file . "\n";
+#		unlink($destination_file);
+		copy_file($file, 'backups/' . $destination_file);
+	}
+
+	# Fix the factions
+	quest_faction_convert();	
 }

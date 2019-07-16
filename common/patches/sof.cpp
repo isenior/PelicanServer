@@ -1156,7 +1156,26 @@ namespace SoF
 		OUT(WIS);
 		OUT(face);
 		//	OUT(unknown02264[47]);
-		OUT_array(spell_book, spells::SPELLBOOK_SIZE);
+
+		if (spells::SPELLBOOK_SIZE <= EQEmu::spells::SPELLBOOK_SIZE) {
+			for (uint32 r = 0; r < spells::SPELLBOOK_SIZE; r++) {
+				if (emu->spell_book[r] <= spells::SPELL_ID_MAX)
+					eq->spell_book[r] = emu->spell_book[r];
+				else
+					eq->spell_book[r] = 0xFFFFFFFFU;
+			}
+		}
+		else {
+			for (uint32 r = 0; r < EQEmu::spells::SPELLBOOK_SIZE; r++) {
+				if (emu->spell_book[r] <= spells::SPELL_ID_MAX)
+					eq->spell_book[r] = emu->spell_book[r];
+				else
+					eq->spell_book[r] = 0xFFFFFFFFU;
+			}
+			// invalidate the rest of the spellbook slots
+			memset(&eq->spell_book[EQEmu::spells::SPELLBOOK_SIZE], 0xFF, (sizeof(uint32) * (spells::SPELLBOOK_SIZE - EQEmu::spells::SPELLBOOK_SIZE)));
+		}
+
 		//	OUT(unknown4184[128]);
 		OUT_array(mem_spells, spells::SPELL_GEM_COUNT);
 		//	OUT(unknown04396[32]);
@@ -1704,14 +1723,18 @@ namespace SoF
 		SpecialMesg_Struct *emu = (SpecialMesg_Struct *)in->pBuffer;
 
 		unsigned char *__emu_buffer = in->pBuffer;
+		// break strlen optimizations!
+		char *message = emu->sayer;
+		auto sayer_length = std::char_traits<char>::length(message);
+		message += sayer_length + 1 + 12; // skip over sayer name, null term, and 3 floats
 
-		std::string old_message = &emu->message[strlen(emu->sayer)];
+		std::string old_message = message;
 		std::string new_message;
 
 		ServerToSoFSayLink(new_message, old_message);
 
 		//in->size = 3 + 4 + 4 + strlen(emu->sayer) + 1 + 12 + new_message.length() + 1;
-		in->size = strlen(emu->sayer) + new_message.length() + 25;
+		in->size = sayer_length + new_message.length() + 25;
 		in->pBuffer = new unsigned char[in->size];
 
 		char *OutBuffer = (char *)in->pBuffer;
@@ -1725,18 +1748,10 @@ namespace SoF
 
 		VARSTRUCT_ENCODE_STRING(OutBuffer, emu->sayer);
 
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[0]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[1]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[2]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[3]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[4]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[5]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[6]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[7]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[8]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[9]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[10]);
-		VARSTRUCT_ENCODE_TYPE(uint8, OutBuffer, emu->unknown12[11]);
+		// TODO: figure this shit out
+		VARSTRUCT_ENCODE_TYPE(float, OutBuffer, 0.0f);
+		VARSTRUCT_ENCODE_TYPE(float, OutBuffer, 0.0f);
+		VARSTRUCT_ENCODE_TYPE(float, OutBuffer, 0.0f);
 
 		VARSTRUCT_ENCODE_STRING(OutBuffer, new_message.c_str());
 
