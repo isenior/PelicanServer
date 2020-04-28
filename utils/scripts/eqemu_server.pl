@@ -52,6 +52,10 @@ if (-e "eqemu_server_skip_update.txt") {
     $skip_self_update_check = 1;
 }
 
+if (-e "eqemu_server_skip_maps_update.txt") {
+    $skip_self_maps_update_check = 1;
+}
+
 #::: Check for script self update
 check_xml_to_json_conversion() if $ARGV[0] eq "convert_xml";
 do_self_update_check_routine() if !$skip_self_update_check;
@@ -399,11 +403,13 @@ sub build_linux_source {
     print `git clone https://github.com/EQEmu/Server.git`;
 
     mkdir($source_dir . "/Server/build") if (!-e $source_dir . "/Server/build");
-    chdir($source_dir . "/Server/build");
+    chdir($source_dir . "/Server");
 
     print `git submodule init`;
     print `git submodule update`;
 
+    chdir($source_dir . "/Server/build");
+    
     print "Generating CMake build files...\n";
     if ($os_flavor eq "fedora_core") {
         print `cmake $cmake_options -DEQEMU_BUILD_LOGIN=ON -DEQEMU_BUILD_LUA=ON -DLUA_INCLUDE_DIR=/usr/include/lua-5.1/ -G "Unix Makefiles" ..`;
@@ -454,10 +460,11 @@ sub do_installer_routines {
         fetch_latest_windows_appveyor();
         get_remote_file($install_repository_request_url . "lua51.dll", "lua51.dll", 1);
         get_remote_file($install_repository_request_url . "zlib1.dll", "zlib1.dll", 1);
+		get_remote_file($install_repository_request_url . "zlib1.pdb", "zlib1.pdb", 1);
         get_remote_file($install_repository_request_url . "libmysql.dll", "libmysql.dll", 1);
     }
 
-    map_files_fetch_bulk();
+    map_files_fetch_bulk() if !$skip_self_maps_update_check;
     opcodes_fetch();
     plugins_fetch();
     quest_files_fetch();
@@ -469,9 +476,19 @@ sub do_installer_routines {
     print `"$path" --host $host --user $user --password="$pass" -N -B -e "DROP DATABASE IF EXISTS $db_name;"`;
     print `"$path" --host $host --user $user --password="$pass" -N -B -e "CREATE DATABASE $db_name"`;
 
+    my $world_path = "world";
+    if (-e "bin/world") {
+        $world_path = "bin/world";
+    }
+
     #::: Get Binary DB version
-    if ($OS eq "Windows") { @db_version = split(': ', `world db_version`); }
-    if ($OS eq "Linux") { @db_version   = split(': ', `./world db_version`); }
+    if ($OS eq "Windows") {
+        @db_version = split(': ', `$world_path db_version`);
+    }
+    if ($OS eq "Linux") {
+        @db_version = split(': ', `./$world_path db_version`);
+    }
+
     $binary_database_version            = trim($db_version[1]);
 
     #::: Local DB Version
@@ -480,9 +497,7 @@ sub do_installer_routines {
 
     #::: Download PEQ latest
     fetch_peq_db_full();
-    print "[Database] Fetching Latest Database Updates...\n";
-    main_db_management();
-    print "[Database] Applying Latest Database Updates...\n";
+    print "[Database] Fetching and Applying Latest Database Updates...\n";
     main_db_management();
 
     remove_duplicate_rule_values();
@@ -503,43 +518,29 @@ sub check_for_input {
 }
 
 sub check_for_world_bootup_database_update {
+
+    my $world_path = "world";
+    if (-e "bin/world") {
+        $world_path = "bin/world";
+    }
+
+    #::: Get Binary DB version
     if ($OS eq "Windows") {
-        @db_version = split(': ', `world db_version`);
+        @db_version = split(': ', `$world_path db_version`);
     }
     if ($OS eq "Linux") {
-        @db_version = split(': ', `./world db_version`);
+        @db_version = split(': ', `./$world_path db_version`);
     }
-
+    
     $binary_database_version = trim($db_version[1]);
-    $local_database_version  = trim(get_mysql_result("SELECT version FROM db_version LIMIT 1"));
-
-    #::: Bots
-    $bots_binary_version = trim($db_version[2]);
-    if ($bots_binary_version > 0) {
-        $bots_local_db_version = get_bots_db_version();
-        #::: We ran world - Database needs to update, lets backup and run updates and continue world bootup
-
-        if ($bots_local_db_version < $bots_binary_version && $ARGV[0] eq "ran_from_world") {
-            print "[Update] Bots Database not up to date with binaries... Automatically updating...\n";
-            print "[Update] Issuing database backup first...\n";
-            database_dump_compress();
-            print "[Update] Updating bots database...\n";
-            sleep(1);
-            bots_db_management();
-            run_database_check();
-            print "[Update] Continuing bootup\n";
-            analytics_insertion("auto database bots upgrade world", $db . " :: Binary DB Version / Local DB Version :: " . $binary_database_version . " / " . $local_database_version);
-
-            exit;
-        }
-        else {
-            print "[Update] Bots database up to Date: Continuing World Bootup...\n";
-        }
-    }
+    $local_database_version  = get_main_db_version();
 
     if ($binary_database_version == $local_database_version && $ARGV[0] eq "ran_from_world") {
         print "[Update] Database up to date...\n";
-        exit;
+        if (trim($db_version[2]) == 0) {
+            print "[Update] Continuing bootup\n";
+            exit;
+        }
     }
     else {
         #::: We ran world - Database needs to update, lets backup and run updates and continue world bootup
@@ -547,22 +548,61 @@ sub check_for_world_bootup_database_update {
             print "[Update] Database not up to date with binaries... Automatically updating...\n";
             print "[Update] Issuing database backup first...\n";
             database_dump_compress();
+            $db_already_backed_up = 1;
             print "[Update] Updating database...\n";
             sleep(1);
             main_db_management();
-            main_db_management();
-            print "[Update] Continuing bootup\n";
+            
             analytics_insertion("auto database upgrade world", $db . " :: Binary DB Version / Local DB Version :: " . $binary_database_version . " / " . $local_database_version);
-
-            exit;
         }
 
         #::: Make sure that we didn't pass any arugments to the script
         else {
+            if ($local_database_version > $binary_database_version) {
+                print "[Update] Database version is ahead of current binaries...\n";
+			}
+            
             if (!$db) { print "[eqemu_server.pl] No database connection found... Running without\n"; }
             show_menu_prompt();
         }
     }
+
+    #::: Bots
+    $binary_database_version = trim($db_version[2]);
+    if ($binary_database_version > 0) {
+        $local_database_version = get_bots_db_version();
+        
+        #::: We ran world - Database needs to update, lets backup and run updates and continue world bootup
+        if ($binary_database_version == $local_database_version && $ARGV[0] eq "ran_from_world") {
+            print "[Update] Bots database up to date...\n";
+        }
+        else {
+            if ($local_database_version < $binary_database_version && $ARGV[0] eq "ran_from_world") {
+                print "[Update] Bots Database not up to date with binaries... Automatically updating...\n";
+                if (!$db_already_backed_up) {
+                    print "[Update] Issuing database backup first...\n";
+                    database_dump_compress();
+                }
+                print "[Update] Updating bots database...\n";
+                sleep(1);
+                bots_db_management();
+                
+                analytics_insertion("auto database bots upgrade world", $db . " :: Binary DB Version / Local DB Version :: " . $binary_database_version . " / " . $local_database_version);
+            }
+            
+            #::: Make sure that we didn't pass any arugments to the script
+            else {
+                if ($local_database_version > $binary_database_version) {
+                    print "[Update] Bots database version is ahead of current binaries...\n";
+                }
+                
+                if (!$db) { print "[eqemu_server.pl] No database connection found... Running without\n"; }
+                show_menu_prompt();
+            }
+        }
+    }
+    
+    print "[Update] Continuing bootup\n";
 }
 
 sub check_internet_connection {
@@ -609,7 +649,7 @@ sub do_self_update_check_routine {
 
     #::: Check for internet connection before updating
     if (!$has_internet_connection) {
-        print "[Update] Cannot check update without internet connection...\n";
+        print "[Update] Cannot check self-update without internet connection...\n";
         return;
     }
 
@@ -731,6 +771,46 @@ sub do_install_config_json {
     unlink("eqemu_config_template.json");
 }
 
+sub do_install_config_login_json {
+    get_installation_variables();
+
+    #::: Fetch json template
+    get_remote_file($eqemu_repository_request_url . "loginserver/login_util/login.json", "login_template.json");
+
+    use JSON;
+    my $json = new JSON();
+
+    my $content;
+    open(my $fh, '<', "login_template.json") or die "cannot open file $filename"; {
+        local $/;
+        $content = <$fh>;
+    }
+    close($fh);
+
+    $config = $json->decode($content);
+
+    if ($installation_variables{"mysql_eqemu_db_name"}) {
+        $db_name = $installation_variables{"mysql_eqemu_db_name"};
+    }
+    else {
+        $db_name = "peq";
+    }
+
+    $config->{"database"}{"host"} = "127.0.0.1";
+    $config->{"database"}{"user"} = $installation_variables{"mysql_eqemu_user"};
+    $config->{"database"}{"password"} = $installation_variables{"mysql_eqemu_password"};
+    $config->{"database"}{"db"}       = $db_name;
+
+    $json->canonical(1);
+    $json->indent_length(5);
+
+    open(my $fh, '>', 'login.json');
+    print $fh $json->pretty->indent_length(5)->utf8->encode($config);
+    close $fh;
+
+    unlink("login_template.json");
+}
+
 sub fetch_utility_scripts {
     if ($OS eq "Windows") {
         get_remote_file($install_repository_request_url . "t_database_backup.bat", "t_database_backup.bat");
@@ -753,15 +833,14 @@ sub fetch_utility_scripts {
 
 sub setup_bots {
     if ($OS eq "Windows") {
-        fetch_latest_windows_binaries_bots();
+        fetch_latest_windows_appveyor_bots();
     }
     if ($OS eq "Linux") {
         build_linux_source("bots");
     }
     bots_db_management();
-    run_database_check();
 
-    print "Bots should be setup, run your server and the #bot command should be available in-game\n";
+    print "Bots should be setup, run your server and the bot command should be available in-game (type '^help')\n";
 }
 
 sub show_menu_prompt {
@@ -894,12 +973,10 @@ sub show_menu_prompt {
         }
         elsif ($input eq "check_db_updates") {
             main_db_management();
-            main_db_management();
             $dc = 1;
         }
         elsif ($input eq "check_bot_db_updates") {
             bots_db_management();
-            run_database_check();
             $dc = 1;
         }
         elsif ($input eq "setup_loginserver") {
@@ -1340,6 +1417,7 @@ sub remove_duplicate_rule_values {
 sub copy_file {
     $l_source_file      = $_[0];
     $l_destination_file = $_[1];
+    
     if ($l_destination_file =~ /\//i) {
         my @directory_path = split('/', $l_destination_file);
         $build_path        = "";
@@ -1358,6 +1436,7 @@ sub copy_file {
             $directory_index++;
         }
     }
+    
     copy $l_source_file, $l_destination_file;
 }
 
@@ -1476,9 +1555,13 @@ sub do_windows_login_server_setup {
     print "[Install] Done... \n";
 
     print "[Install] Pulling down Loginserver database tables...\n";
-    get_remote_file($install_repository_request_url . "login_server_tables.sql", "db_update/login_server_tables.sql");
+    get_remote_file($eqemu_repository_request_url . "loginserver/login_util/login_schema.sql", "db_update/login_schema.sql");
     print "[Install] Installing Loginserver tables...\n";
-    print get_mysql_result_from_file("db_update/login_server_tables.sql");
+    print get_mysql_result_from_file("db_update/login_schema.sql");
+    print "[Install] Done...\n";
+
+    print "[Install] Pulling and initializing Loginserver configuration files...\n";
+    do_install_config_login_json();
     print "[Install] Done...\n";
 
     add_login_server_firewall_rules();
@@ -1505,44 +1588,22 @@ sub do_linux_login_server_setup {
     print "\n Done... \n";
 
     print "[Install] Pulling down Loginserver database tables...\n";
-    get_remote_file($install_repository_request_url . "login_server_tables.sql", "db_update/login_server_tables.sql");
+    get_remote_file($eqemu_repository_request_url . "loginserver/login_util/login_schema.sql", "db_update/login_schema.sql");
     print "[Install] Installing Loginserver tables...\n";
-    print get_mysql_result_from_file("db_update/login_server_tables.sql");
+    print get_mysql_result_from_file("db_update/login_schema.sql");
     print "[Install] Done...\n\n";
+
+    print "[Install] Pulling and initializing Loginserver configuration files...\n";
+    do_install_config_login_json();
+    print "[Install] Done...\n";
 
     rmtree('updates_staged');
     rmtree('db_update');
 
-    get_remote_file($install_repository_request_url . "linux/login.ini", "login_template.ini");
     get_remote_file($install_repository_request_url . "linux/login_opcodes.conf", "login_opcodes.conf");
     get_remote_file($install_repository_request_url . "linux/login_opcodes_sod.conf", "login_opcodes_sod.conf");
     get_remote_file($install_repository_request_url . "linux/server_start_with_login.sh", "server_start_with_login.sh");
     system("chmod 755 *.sh");
-
-    get_installation_variables();
-    my $db_name     = $installation_variables{"mysql_eqemu_db_name"};
-    my $db_user     = $installation_variables{"mysql_eqemu_user"};
-    my $db_password = $installation_variables{"mysql_eqemu_password"};
-
-    #::: Open new config file
-    open(NEW_CONFIG, '>', 'login.ini');
-
-    #::: Iterate through template and replace variables...
-    open(FILE_TEMPLATE, "login_template.ini");
-    while (<FILE_TEMPLATE>) {
-        chomp;
-        $o = $_;
-        #::: Find replace variables
-        if ($o =~ /db/i) { $o       = "db = " . $db_name; }
-        if ($o =~ /user/i) { $o     = "user = " . $db_user; }
-        if ($o =~ /password/i) { $o = "password = " . $db_password; }
-
-        print NEW_CONFIG $o . "\n";
-    }
-
-    close(FILE_TEMPLATE);
-    close(NEW_CONFIG);
-    unlink("login_template.ini");
 
     print "[Install] Press any key to continue...\n";
 
@@ -1587,22 +1648,24 @@ sub add_login_server_firewall_rules {
         print "If firewall rules don't add you must run this script (eqemu_server.pl) as administrator\n";
         print "\n";
         print "[Install] Instructions \n";
-        print "[Install] In order to connect your server to the loginserver you must point your eqemu_config.xml to your local server similar to the following:\n";
+        print "[Install] In order to connect your server to the loginserver you must point your eqemu_config.json to your local server similar to the following:\n";
         print "
-	<loginserver1>
-		<host>login.eqemulator.net</host>
-		<port>5998</port>
-		<account></account>
-		<password></password>
-	</loginserver1>
-	<loginserver2>
-		<host>127.0.0.1</host>
-		<port>5998</port>
-		<account></account>
-		<password></password>
-	</loginserver2>
+	\"loginserver1\" : {
+		\"account\" : \"\",
+		\"host\" : \"login.eqemulator.net\",
+		\"password\" : \"\",
+		\"port\" : \"5998\",
+		\"legacy\": \"1\"
+	},
+	\"loginserver2\" : {
+		\"account\" : \"\",
+		\"host\" : \"192.168.197.129\",
+		\"password\" : \"\",
+		\"port\" : \"5998\"
+	},
+	\"localaddress\" : \"192.168.197.129\",
 		";
-        print "[Install] When done, make sure your EverQuest client points to your loginserver's IP (In this case it would be 127.0.0.1) in the eqhosts.txt file\n";
+        print "[Install] When done, make sure your EverQuest client points to your loginserver's IP (In this case it would be 192.168.197.129) in the eqhosts.txt file\n";
     }
 }
 
@@ -1640,34 +1703,31 @@ sub check_windows_firewall_rules {
 }
 
 sub fetch_server_dlls {
-    print "[Download] Fetching lua51.dll, zlib1.dll, libmysql.dll...\n";
+    print "[Download] Fetching lua51.dll, zlib1.dll, zlib1.pdb, libmysql.dll...\n";
     get_remote_file($install_repository_request_url . "lua51.dll", "lua51.dll", 1);
     get_remote_file($install_repository_request_url . "zlib1.dll", "zlib1.dll", 1);
+	get_remote_file($install_repository_request_url . "zlib1.pdb", "zlib1.pdb", 1);
     get_remote_file($install_repository_request_url . "libmysql.dll", "libmysql.dll", 1);
 }
 
 sub fetch_peq_db_full {
     print "[Install] Downloading latest PEQ Database... Please wait...\n";
-    get_remote_file("http://edit.peqtgc.com/weekly/peq_beta.zip", "updates_staged/peq_beta.zip", 1);
+    get_remote_file("http://db.projecteq.net/api/v1/dump/latest", "updates_staged/peq-latest.zip", 1);
     print "[Install] Downloaded latest PEQ Database... Extracting...\n";
-    unzip('updates_staged/peq_beta.zip', 'updates_staged/peq_db/');
-    my $start_dir = "updates_staged/peq_db";
+    unzip('updates_staged/peq-latest.zip', 'updates_staged/peq_db/');
+    my $start_dir = "updates_staged/peq_db/peq-dump";
     find(
         sub { push @files, $File::Find::name unless -d; },
         $start_dir
     );
     for my $file (@files) {
         $destination_file = $file;
-        $destination_file =~ s/updates_staged\/peq_db\///g;
-        if ($file =~ /peqbeta|player_tables/i) {
+        $destination_file =~ s/updates_staged\/peq_db\/peq-dump\///g;
+        if ($file =~ /create_tables_content|create_tables_login|create_tables_player|create_tables_queryserv|create_tables_state|create_tables_system/i) {
             print "[Install] DB :: Installing :: " . $destination_file . "\n";
             get_mysql_result_from_file($file);
         }
     }
-
-    #::: PEQ DB baseline version
-    print get_mysql_result("DELETE FROM db_version");
-    print get_mysql_result("INSERT INTO `db_version` (`version`) VALUES (9130);");
 }
 
 sub map_files_fetch_bulk {
@@ -1783,6 +1843,8 @@ sub quest_files_fetch {
     if ($fc == 0) {
         print "[Update] No Quest Updates found... \n\n";
     }
+	
+    rmtree("updates_staged/");
 }
 
 sub lua_modules_fetch {
@@ -1954,15 +2016,6 @@ sub do_bots_db_schema_drop {
     print get_mysql_result_from_file("db_update/drop_bots.sql");
 
     print "[Database] Removing bot database tables...\n";
-    print get_mysql_result("DELETE FROM `rule_values` WHERE `rule_name` LIKE 'Bots:%';");
-
-    if (get_mysql_result("SHOW TABLES LIKE 'commands'") ne "" && $db) {
-        print get_mysql_result("DELETE FROM `commands` WHERE `command` LIKE 'bot';");
-    }
-
-    if (get_mysql_result("SHOW TABLES LIKE 'command_settings'") ne "" && $db) {
-        print get_mysql_result("DELETE FROM `command_settings` WHERE `command` LIKE 'bot';");
-    }
 
     if (get_mysql_result("SHOW KEYS FROM `group_id` WHERE `Key_name` LIKE 'PRIMARY'") ne "" && $db) {
         print get_mysql_result("ALTER TABLE `group_id` DROP PRIMARY KEY;");
@@ -1995,70 +2048,6 @@ sub modify_db_for_bots {
         print get_mysql_result("ALTER TABLE `group_id` DROP PRIMARY KEY;");
     }
     print get_mysql_result("ALTER TABLE `group_id` ADD PRIMARY KEY USING BTREE(`groupid`, `charid`, `name`, `ismerc`);");
-
-    if (get_mysql_result("SHOW TABLES LIKE 'command_settings'") ne "" && get_mysql_result("SELECT `command` FROM `command_settings` WHERE `command` LIKE 'bot'") eq "" && $db) {
-        print get_mysql_result("INSERT INTO `command_settings` VALUES ('bot', '0', '');");
-    }
-
-    if (get_mysql_result("SHOW TABLES LIKE 'commands'") ne "" && get_mysql_result("SELECT `command` FROM `commands` WHERE `command` LIKE 'bot'") eq "" && $db) {
-        print get_mysql_result("INSERT INTO `commands` VALUES ('bot', '0');");
-    }
-
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:BotAAExpansion'") ne "" && $db) {
-        print get_mysql_result("UPDATE `rule_values` SET `rule_name` = 'Bots:AAExpansion' WHERE `rule_name` LIKE 'Bots:BotAAExpansion';");
-    }
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:AAExpansion'") eq "" && $db) {
-        print get_mysql_result("INSERT INTO `rule_values` VALUES ('1', 'Bots:AAExpansion', '8', 'The expansion through which bots will obtain AAs');");
-    }
-
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:CreateBotCount'") ne "" && $db) {
-        print get_mysql_result("UPDATE `rule_values` SET `rule_name` = 'Bots:CreationLimit' WHERE `rule_name` LIKE 'Bots:CreateBotCount';");
-    }
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:CreationLimit'") eq "" && $db) {
-        print get_mysql_result("INSERT INTO `rule_values` VALUES ('1', 'Bots:CreationLimit', '150', 'Number of bots that each account can create');");
-    }
-
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:BotFinishBuffing'") ne "" && $db) {
-        print get_mysql_result("UPDATE `rule_values` SET `rule_name` = 'Bots:FinishBuffing' WHERE `rule_name` LIKE 'Bots:BotFinishBuffing';");
-    }
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:FinishBuffing'") eq "" && $db) {
-        print get_mysql_result("INSERT INTO `rule_values` VALUES ('1', 'Bots:FinishBuffing', 'false', 'Allow for buffs to complete even if the bot caster is out of mana.  Only affects buffing out of combat.');");
-    }
-
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:BotGroupBuffing'") ne "" && $db) {
-        print get_mysql_result("UPDATE `rule_values` SET `rule_name` = 'Bots:GroupBuffing' WHERE `rule_name` LIKE 'Bots:BotGroupBuffing';");
-    }
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:GroupBuffing'") eq "" && $db) {
-        print get_mysql_result("INSERT INTO `rule_values` VALUES ('1', 'Bots:GroupBuffing', 'false', 'Bots will cast single target buffs as group buffs, default is false for single. Does not make single target buffs work for MGB.');");
-    }
-
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:BotManaRegen'") ne "" && $db) {
-        print get_mysql_result("UPDATE `rule_values` SET `rule_name` = 'Bots:ManaRegen' WHERE `rule_name` LIKE 'Bots:BotManaRegen';");
-    }
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:ManaRegen'") eq "" && $db) {
-        print get_mysql_result("INSERT INTO `rule_values` VALUES ('1', 'Bots:ManaRegen', '3.0', 'Adjust mana regen for bots, 1 is fast and higher numbers slow it down 3 is about the same as players.');");
-    }
-
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:BotQuest'") ne "" && $db) {
-        print get_mysql_result("UPDATE `rule_values` SET `rule_name` = 'Bots:QuestableSpawnLimit' WHERE `rule_name` LIKE 'Bots:BotQuest';");
-    }
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:QuestableSpawnLimit'") eq "" && $db) {
-        print get_mysql_result("INSERT INTO `rule_values` VALUES ('1', 'Bots:QuestableSpawnLimit', 'false', 'Optional quest method to manage bot spawn limits using the quest_globals name bot_spawn_limit, see: /bazaar/Aediles_Thrall.pl');");
-    }
-
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:BotSpellQuest'") ne "" && $db) {
-        print get_mysql_result("UPDATE `rule_values` SET `rule_name` = 'Bots:QuestableSpells' WHERE `rule_name` LIKE 'Bots:BotSpellQuest';");
-    }
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:QuestableSpells'") eq "" && $db) {
-        print get_mysql_result("INSERT INTO `rule_values` VALUES ('1', 'Bots:QuestableSpells', 'false', 'Anita Thrall\\\'s (Anita_Thrall.pl) Bot Spell Scriber quests.');");
-    }
-
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:SpawnBotCount'") ne "" && $db) {
-        print get_mysql_result("UPDATE `rule_values` SET `rule_name` = 'Bots:SpawnLimit' WHERE `rule_name` LIKE 'Bots:SpawnBotCount';");
-    }
-    if (get_mysql_result("SELECT `rule_name` FROM `rule_values` WHERE `rule_name` LIKE 'Bots:SpawnLimit'") eq "" && $db) {
-        print get_mysql_result("INSERT INTO `rule_values` VALUES ('1', 'Bots:SpawnLimit', '71', 'Number of bots a character can have spawned at one time, You + 71 bots is a 12 group raid');");
-    }
 
     convert_existing_bot_data();
 }
@@ -2158,47 +2147,49 @@ sub convert_existing_bot_data {
     }
 }
 
+sub get_main_db_version {
+    $main_local_db_version = trim(get_mysql_result("SELECT version FROM db_version LIMIT 1"));
+    return $main_local_db_version;
+}
+
 sub get_bots_db_version {
     #::: Check if bots_version column exists...
     if (get_mysql_result("SHOW COLUMNS FROM db_version LIKE 'bots_version'") eq "" && $db) {
         print get_mysql_result("ALTER TABLE db_version ADD bots_version int(11) DEFAULT '0' AFTER version;");
         print "[Database] Column 'bots_version' does not exists.... Adding to 'db_version' table...\n\n";
     }
+    
     $bots_local_db_version = trim(get_mysql_result("SELECT bots_version FROM db_version LIMIT 1"));
     return $bots_local_db_version;
 }
 
+#::: Safe for call from world startup or menu option
 sub bots_db_management {
-    if ($OS eq "Windows") {
-        @db_version = split(': ', `world db_version`);
-    }
-    if ($OS eq "Linux") {
-        @db_version = split(': ', `./world db_version`);
-    }
-
-    #::: Main Binary Database version
-    $binary_database_version = trim($db_version[2]);
-
     #::: If we have stale data from main db run
     if ($db_run_stage > 0 && $bots_db_management == 0) {
         clear_database_runs();
     }
-
+    
+    #::: Main Binary Database version
+    $binary_database_version = trim($db_version[2]);
     if ($binary_database_version == 0) {
         print "[Database] Your server binaries (world/zone) are not compiled for bots...\n\n";
         return;
     }
-
+	$local_database_version = get_bots_db_version();
+    
     #::: Set on flag for running bot updates...
     $bots_db_management = 1;
-
-    $bots_local_db_version = get_bots_db_version();
-
-    $local_database_version = $bots_local_db_version;
-
+    
+    if ($local_database_version > $binary_database_version) {
+        print "[Update] Bots database version is ahead of current binaries...\n";
+        return;
+    }
+    
     run_database_check();
 }
 
+#::: Safe for call from world startup or menu option
 sub main_db_management {
     #::: If we have stale data from bots db run
     if ($db_run_stage > 0 && $bots_db_management == 1) {
@@ -2207,8 +2198,15 @@ sub main_db_management {
 
     #::: Main Binary Database version
     $binary_database_version = trim($db_version[1]);
+	$local_database_version = get_main_db_version();
 
     $bots_db_management = 0;
+    
+    if ($local_database_version > $binary_database_version) {
+        print "[Update] Database version is ahead of current binaries...\n";
+        return;
+    }
+    
     run_database_check();
 }
 
@@ -2218,148 +2216,70 @@ sub clear_database_runs {
     %m_d = ();
     #::: Clear updates...
     @total_updates = ();
-    #::: Clear stage
-    $db_run_stage = 0;
 }
 
 #::: Responsible for Database Upgrade Routines
 sub run_database_check {
-
+    
     if (!$db) {
         print "No database present, check your eqemu_config.xml for proper MySQL/MariaDB configuration...\n";
         return;
     }
-
-    if (!@total_updates) {
-        #::: Pull down bots database manifest
-        if ($bots_db_management == 1) {
-            print "[Database] Retrieving latest bots database manifest...\n";
-            get_remote_file($eqemu_repository_request_url . "utils/sql/git/bots/bots_db_update_manifest.txt", "db_update/db_update_manifest.txt");
-        }
-        #::: Pull down mainstream database manifest
-        else {
-            print "[Database] Retrieving latest database manifest...\n";
-            get_remote_file($eqemu_repository_request_url . "utils/sql/db_update_manifest.txt", "db_update/db_update_manifest.txt");
-        }
+    
+    #::: Pull down bots database manifest
+    if ($bots_db_management == 1) {
+        print "[Database] Retrieving latest bots database manifest...\n";
+        get_remote_file($eqemu_repository_request_url . "utils/sql/git/bots/bots_db_update_manifest.txt", "db_update/db_update_manifest.txt");
     }
-
-    #::: Run 2 - Running pending updates...
-    if (@total_updates || $db_run_stage == 1) {
-        @total_updates = sort @total_updates;
-        foreach my $val (@total_updates) {
-            $file_name = trim($m_d{$val}[1]);
-            print "[Database] Running Update: " . $val . " - " . $file_name . "\n";
-            print get_mysql_result_from_file("db_update/$file_name");
-            print get_mysql_result("UPDATE db_version SET version = $val WHERE version < $val");
-
-            if ($bots_db_management == 1 && $val == 9000) {
-                modify_db_for_bots();
-            }
-
-            if ($val == 9138) {
-                fix_quest_factions();
-            }
-        }
-        $db_run_stage = 2;
-    }
-    #::: Run 1 - Initial checking of needed updates...
+    #::: Pull down mainstream database manifest
     else {
-        print "[Database] Reading manifest...\n";
-
-        use Data::Dumper;
-        open(FILE, "db_update/db_update_manifest.txt");
-        while (<FILE>) {
-            chomp;
-            $o = $_;
-            if ($o =~ /#/i) {
-                next;
-            }
-
-            @manifest          = split('\|', $o);
-            $m_d{$manifest[0]} = [ @manifest ];
-        }
-        #::: Setting Manifest stage...
-        $db_run_stage = 1;
+        print "[Database] Retrieving latest database manifest...\n";
+        get_remote_file($eqemu_repository_request_url . "utils/sql/db_update_manifest.txt", "db_update/db_update_manifest.txt");
     }
-
-    @total_updates = ();
-
+    
+    #::: Parse manifest
+    print "[Database] Reading manifest...\n";
+    
+    use Data::Dumper;
+    open(FILE, "db_update/db_update_manifest.txt");
+    while (<FILE>) {
+        chomp;
+        $o = $_;
+        if ($o =~ /#/i) {
+            next;
+        }
+        
+        @manifest          = split('\|', $o);
+        $m_d{$manifest[0]} = [ @manifest ];
+    }
+    
     #::: This is where we set checkpoints for where a database might be so we don't check so far back in the manifest...
     if ($local_database_version >= 9000) {
-        $revision_check = $local_database_version;
+        $revision_check = $local_database_version + 1;
     }
     else {
+        #::: This does not negatively affect bots
         $revision_check = 1000;
         if (get_mysql_result("SHOW TABLES LIKE 'character_data'") ne "") {
             $revision_check = 8999;
         }
     }
-
-    #::: Iterate through Manifest backwards from binary version down to local version...
+    
+    @total_updates = ();
+    
+    #::: Fetch and register sqls for this database update cycle
     for ($i = $revision_check; $i <= $binary_database_version; $i++) {
         if (!defined($m_d{$i}[0])) {
             next;
         }
-
-        $file_name   = trim($m_d{$i}[1]);
-        $query_check = trim($m_d{$i}[2]);
-        $match_type  = trim($m_d{$i}[3]);
-        $match_text  = trim($m_d{$i}[4]);
-
-        #::: Match type update
-        if ($match_type eq "contains") {
-            if (trim(get_mysql_result($query_check)) =~ /$match_text/i) {
-                print "[Database] missing update: " . $i . " '" . $file_name . "' \n";
-                fetch_missing_db_update($i, $file_name);
-                push(@total_updates, $i);
-            }
-            else {
-                print "[Database] has update (" . $i . ") '" . $file_name . "' \n";
-            }
-            print_match_debug();
-            print_break();
-        }
-        if ($match_type eq "missing") {
-            if (get_mysql_result($query_check) =~ /$match_text/i) {
-                print "[Database] has update (" . $i . ") '" . $file_name . "' \n";
-                next;
-            }
-            else {
-                print "[Database] missing update: " . $i . " '" . $file_name . "' \n";
-                fetch_missing_db_update($i, $file_name);
-                push(@total_updates, $i);
-            }
-            print_match_debug();
-            print_break();
-        }
-        if ($match_type eq "empty") {
-            if (get_mysql_result($query_check) eq "") {
-                print "[Database] missing update: " . $i . " '" . $file_name . "' \n";
-                fetch_missing_db_update($i, $file_name);
-                push(@total_updates, $i);
-            }
-            else {
-                print "[Database] has update (" . $i . ") '" . $file_name . "' \n";
-            }
-            print_match_debug();
-            print_break();
-        }
-        if ($match_type eq "not_empty") {
-            if (get_mysql_result($query_check) ne "") {
-                print "[Database] missing update: " . $i . " '" . $file_name . "' \n";
-                fetch_missing_db_update($i, $file_name);
-                push(@total_updates, $i);
-            }
-            else {
-                print "[Database] has update (" . $i . ") '" . $file_name . "' \n";
-            }
-            print_match_debug();
-            print_break();
-        }
+        
+        $file_name = trim($m_d{$i}[1]);
+        print "[Database] fetching update: " . $i . " '" . $file_name . "' \n";
+        fetch_missing_db_update($i, $file_name);
+        push(@total_updates, $i);
     }
-    print "\n";
-
-    if (scalar(@total_updates) == 0 && $db_run_stage == 2) {
+    
+    if (scalar(@total_updates) == 0) {
         print "[Database] No updates need to be run...\n";
         if ($bots_db_management == 1) {
             print "[Database] Setting Database to Bots Binary Version (" . $binary_database_version . ") if not already...\n\n";
@@ -2369,24 +2289,106 @@ sub run_database_check {
             print "[Database] Setting Database to Binary Version (" . $binary_database_version . ") if not already...\n\n";
             get_mysql_result("UPDATE db_version SET version = $binary_database_version ");
         }
-
+        
         clear_database_runs();
+        return;
+    }
+    
+    #::: Execute pending updates
+    @total_updates = sort @total_updates;
+    foreach my $val (@total_updates) {
+        $file_name   = trim($m_d{$val}[1]);
+        $query_check = trim($m_d{$val}[2]);
+        $match_type  = trim($m_d{$val}[3]);
+        $match_text  = trim($m_d{$val}[4]);
+        
+        #::: Match type update
+        if ($match_type eq "contains") {
+            if (trim(get_mysql_result($query_check)) =~ /$match_text/i) {
+                print "[Database] Applying update [" . $val . "]:[" . $file_name . "]\n";
+                print get_mysql_result_from_file("db_update/$file_name");
+            }
+            else {
+                print "[Database] Has update [" . $val . "]:[" . $file_name . "]\n";
+            }
+            print_match_debug();
+            print_break();
+        }
+        if ($match_type eq "missing") {
+            if (get_mysql_result($query_check) =~ /$match_text/i) {
+                print "[Database] Has update [" . $val . "]:[" . $file_name . "]\n";
+            }
+            else {
+                print "[Database] Applying update [" . $val . "]:[" . $file_name . "]\n";
+                print get_mysql_result_from_file("db_update/$file_name");
+            }
+            print_match_debug();
+            print_break();
+        }
+        if ($match_type eq "empty") {
+            if (get_mysql_result($query_check) eq "") {
+                print "[Database] Applying update [" . $val . "]:[" . $file_name . "]\n";
+                print get_mysql_result_from_file("db_update/$file_name");
+            }
+            else {
+                print "[Database] Has update [" . $val . "]:[" . $file_name . "' \n";
+            }
+            print_match_debug();
+            print_break();
+        }
+        if ($match_type eq "not_empty") {
+            if (get_mysql_result($query_check) ne "") {
+                print "[Database] Applying update [" . $val . "]:[" . $file_name . "]\n";
+                print get_mysql_result_from_file("db_update/$file_name");
+            }
+            else {
+                print "[Database] Has update [" . $val . "]:[" . $file_name . "]\n";
+            }
+            print_match_debug();
+            print_break();
+        }
+        
+        if ($bots_db_management == 1) {
+            print get_mysql_result("UPDATE db_version SET bots_version = $val WHERE bots_version < $val");
+            
+            if ($val == 9000) {
+                modify_db_for_bots();
+            }
+        }
+        else {
+            print get_mysql_result("UPDATE db_version SET version = $val WHERE version < $val");
+            
+            if ($val == 9138) {
+                fix_quest_factions();
+            }
+        }
+    }
+    
+    if ($bots_db_management == 1) {
+        print "[Database] Bots database update cycle complete at version [" . get_bots_db_version() . "]\n";
+    }
+    else {
+        print "[Database] Mainstream database update cycle complete at version [" . get_main_db_version() . "]\n";
     }
 }
+
 
 sub fetch_missing_db_update {
     $db_update   = $_[0];
     $update_file = $_[1];
-    if ($db_update >= 9000) {
-        if ($bots_db_management == 1) {
+    
+    if ($bots_db_management == 1) {
+        if ($db_update >= 9000) {
             get_remote_file($eqemu_repository_request_url . "utils/sql/git/bots/required/" . $update_file, "db_update/" . $update_file . "");
         }
-        else {
+    }
+    else {
+        if ($db_update >= 9000) {
             get_remote_file($eqemu_repository_request_url . "utils/sql/git/required/" . $update_file, "db_update/" . $update_file . "");
         }
-    }
-    elsif ($db_update >= 5000 && $db_update <= 9000) {
-        get_remote_file($eqemu_repository_request_url . "utils/sql/svn/" . $update_file, "db_update/" . $update_file . "");
+        elsif ($db_update >= 5000 && $db_update <= 9000) {
+            get_remote_file($eqemu_repository_request_url . "utils/sql/svn/" . $update_file, "db_update/" . $update_file . "");
+        }
     }
 }
 

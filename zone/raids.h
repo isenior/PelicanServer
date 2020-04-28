@@ -152,14 +152,14 @@ public:
 
 	//Actual Implementation Stuff
 
-	void	RaidMessage_StringID(Mob* sender, uint32 type, uint32 string_id, const char* message,const char* message2=0,const char* message3=0,const char* message4=0,const char* message5=0,const char* message6=0,const char* message7=0,const char* message8=0,const char* message9=0, uint32 distance = 0);
+	void	RaidMessageString(Mob* sender, uint32 type, uint32 string_id, const char* message,const char* message2=0,const char* message3=0,const char* message4=0,const char* message5=0,const char* message6=0,const char* message7=0,const char* message8=0,const char* message9=0, uint32 distance = 0);
 	void	CastGroupSpell(Mob* caster,uint16 spellid, uint32 gid);
 	void	SplitExp(uint32 exp, Mob* other);
 	uint32	GetTotalRaidDamage(Mob* other);
 	void	BalanceHP(int32 penalty, uint32 gid, float range = 0, Mob* caster = nullptr, int32 limit = 0);
 	void	BalanceMana(int32 penalty, uint32 gid,  float range = 0, Mob* caster = nullptr, int32 limit = 0);
 	void	HealGroup(uint32 heal_amt, Mob* caster, uint32 gid, float range = 0);
-	void	SplitMoney(uint32 copper, uint32 silver, uint32 gold, uint32 platinum, Client *splitter = nullptr);
+	void	SplitMoney(uint32 gid, uint32 copper, uint32 silver, uint32 gold, uint32 platinum, Client *splitter = nullptr);
 	void	GroupBardPulse(Mob* caster, uint16 spellid, uint32 gid);
 
 	void	TeleportGroup(Mob* sender, uint32 zoneID, uint16 instance_id, float x, float y, float z, float heading, uint32 gid);
@@ -177,8 +177,8 @@ public:
 	void	SendHPManaEndPacketsFrom(Mob *mob);
 	void	SendManaPacketFrom(Mob *mob);
 	void	SendEndurancePacketFrom(Mob *mob);
-	void	RaidSay(const char *msg, Client *c);
-	void	RaidGroupSay(const char *msg, Client *c);
+	void	RaidSay(const char *msg, Client *c, uint8 language, uint8 lang_skill);
+	void	RaidGroupSay(const char *msg, Client *c, uint8 language, uint8 lang_skill);
 
 	//Packet Functions
 	void	SendRaidCreate(Client *to);

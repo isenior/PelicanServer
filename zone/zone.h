@@ -52,6 +52,7 @@ struct ZoneClientAuth_Struct {
 	uint32 accid;
 	int16  admin;
 	uint32 charid;
+	uint32 lsid;
 	bool   tellsoff;
 	char   charname[64];
 	char   lskey[30];
@@ -83,7 +84,7 @@ class MobMovementManager;
 class Zone {
 public:
 	static bool Bootup(uint32 iZoneID, uint32 iInstanceID, bool iStaticZone = false);
-	static void Shutdown(bool quite = false);
+	static void Shutdown(bool quiet = false);
 
 	Zone(uint32 in_zoneid, uint32 in_instanceid, const char *in_short_name);
 	~Zone();
@@ -125,6 +126,9 @@ public:
 	bool Process();
 	bool SaveZoneCFG();
 
+	int GetNpcPositionUpdateDistance() const;
+	void SetNpcPositionUpdateDistance(int in_npc_position_update_distance);
+
 	char *adv_data;
 
 	const char *GetSpellBlockedMessage(uint32 spell_id, const glm::vec3 &location);
@@ -158,7 +162,8 @@ public:
 	inline void SetZoneHasCurrentTime(bool time) { zone_has_current_time = time; }
 	inline void ShowNPCGlobalLoot(Client *to, NPC *who) { m_global_loot.ShowNPCGlobalLoot(to, who); }
 	inline void ShowZoneGlobalLoot(Client *to) { m_global_loot.ShowZoneGlobalLoot(to); }
-	int GetTotalBlockedSpells() { return totalBS; }
+	int GetZoneTotalBlockedSpells() { return zone_total_blocked_spells; }
+	void DumpMerchantList(uint32 npcid);
 	int SaveTempItem(uint32 merchantid, uint32 npcid, uint32 item, int32 charges, bool sold = false);
 	int32 MobsAggroCount() { return aggroedmobs; }
 
@@ -200,6 +205,7 @@ public:
 
 	time_t weather_timer;
 	Timer  spawn2_timer;
+	Timer  hot_reload_timer;
 
 	uint8  weather_intensity;
 	uint8  zone_weather;
@@ -218,6 +224,7 @@ public:
 	void ChangeWeather();
 	void ClearBlockedSpells();
 	void ClearNPCTypeCache(int id);
+	void CalculateNpcUpdateDistanceSpread();
 	void DelAggroMob() { aggroedmobs--; }
 	void DeleteQGlobal(std::string name, uint32 npcID, uint32 charID, uint32 zoneID);
 	void Despawn(uint32 spawngroupID);
@@ -229,7 +236,7 @@ public:
 	void LoadAdventureFlavor();
 	void LoadAlternateAdvancement();
 	void LoadAlternateCurrencies();
-	void LoadBlockedSpells(uint32 zoneid);
+	void LoadZoneBlockedSpells(uint32 zone_id);
 	void LoadLDoNTrapEntries();
 	void LoadLDoNTraps();
 	void LoadLevelEXPMods();
@@ -243,7 +250,8 @@ public:
 	void LoadZoneDoors(const char *zone, int16 version);
 	void ReloadStaticData();
 	void ReloadWorld(uint32 Option);
-	void RemoveAuth(const char *iCharName);
+	void RemoveAuth(const char *iCharName, const char *iLSKey);
+	void RemoveAuth(uint32 lsid);
 	void Repop(uint32 delay = 0);
 	void RepopClose(const glm::vec4 &client_position, uint32 repop_distance);
 	void RequestUCSServerStatus();
@@ -264,9 +272,15 @@ public:
 	void UpdateQGlobal(uint32 qid, QGlobal newGlobal);
 	void weatherSend(Client *client = nullptr);
 
+	bool IsQuestHotReloadQueued() const;
+	void SetQuestHotReloadQueued(bool in_quest_hot_reload_queued);
+
 	WaterMap *watermap;
 	ZonePoint *GetClosestZonePoint(const glm::vec3 &location, uint32 to, Client *client, float max_distance = 40000.0f);
 	ZonePoint *GetClosestZonePointWithoutZone(float x, float y, float z, Client *client, float max_distance = 40000.0f);
+
+	uint32 GetInstanceTimeRemaining() const;
+	void SetInstanceTimeRemaining(uint32 instance_time_remaining);
 
 	/**
 	 * GMSay Callback for LogSys
@@ -288,7 +302,7 @@ public:
 		 */
 		find_replace(message, std::string("%"), std::string("."));
 
-		if (message.find("\n") != std::string::npos) {
+		if (message.find('\n') != std::string::npos) {
 			auto message_split = SplitString(message, '\n');
 			entity_list.MessageStatus(
 				0,
@@ -334,6 +348,9 @@ private:
 	bool      m_ucss_available;
 	bool      staticzone;
 	bool      zone_has_current_time;
+	bool      quest_hot_reload_queued;
+
+private:
 	double    max_movement_update_range;
 	char      *long_name;
 	char      *map_name;
@@ -342,11 +359,13 @@ private:
 	glm::vec3 m_SafePoint;
 	glm::vec4 m_Graveyard;
 	int       default_ruleset;
-	int       totalBS;
+	int       zone_total_blocked_spells;
+	int       npc_position_update_distance;
 	int32     aggroedmobs;
 	uint8     zone_type;
 	uint16    instanceversion;
 	uint32    instanceid;
+	uint32    instance_time_remaining;
 	uint32    pgraveyard_id, pgraveyard_zoneid;
 	uint32    pMaxClients;
 	uint32    zoneid;
