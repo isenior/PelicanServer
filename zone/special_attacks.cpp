@@ -189,7 +189,20 @@ void Mob::DoSpecialAttackDamage(Mob *who, EQEmu::skills::SkillType skill, int32 
 						  // work for most
 	if (skill == EQEmu::skills::SkillThrowing || skill == EQEmu::skills::SkillArchery)
 		my_hit.hand = EQEmu::invslot::slotRange;
-
+	
+	// CUSTOM
+	switch (skill)
+	{
+		case EQEmu::skills::SkillKick:
+		my_hit.base_damage = mod_kick_damage(my_hit.base_damage);
+		break;
+		case EQEmu::skills::SkillBash:
+		my_hit.base_damage = mod_bash_damage(my_hit.base_damage);
+		break;
+		case EQEmu::skills::SkillBackstab:
+		my_hit.base_damage = mod_backstab_damage(my_hit.base_damage);
+		break;
+	}
 	DoAttack(who, my_hit);
 
 	who->AddToHateList(this, hate, 0, false);
@@ -862,7 +875,7 @@ void Mob::DoArcheryAttackDmg(Mob *other, const EQEmu::ItemInstance *RangeWeapon,
 		my_hit.offense = offense(my_hit.skill);
 		my_hit.tohit = GetTotalToHit(my_hit.skill, chance_mod);
 		my_hit.hand = EQEmu::invslot::slotRange;
-
+		my_hit.base_damage = mod_archery_damage(my_hit.base_damage, false, RangeWeapon); // CUSTOM
 		DoAttack(other, my_hit);
 		TotalDmg = my_hit.damage_done;
 	} else {
@@ -1374,7 +1387,8 @@ void Mob::DoThrowingAttackDmg(Mob *other, const EQEmu::ItemInstance *RangeWeapon
 		my_hit.offense = offense(my_hit.skill);
 		my_hit.tohit = GetTotalToHit(my_hit.skill, chance_mod);
 		my_hit.hand = EQEmu::invslot::slotRange;
-
+		
+		my_hit.base_damage = mod_throwing_damage(my_hit.base_damage); // CUSTOM
 		DoAttack(other, my_hit);
 		TotalDmg = my_hit.damage_done;
 

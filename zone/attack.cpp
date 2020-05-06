@@ -416,6 +416,7 @@ bool Mob::AvoidDamage(Mob *other, DamageHitInfo &hit)
 			int slip = aabonuses.OffhandRiposteFail + itembonuses.OffhandRiposteFail + spellbonuses.OffhandRiposteFail;
 			chance += chance * slip / 100;
 		}
+		chance = mod_riposte_chance(chance, attacker); // CUSTOM 
 		if (chance > 0 && zone->random.Roll(chance)) { // could be <0 from offhand stuff
 			hit.damage_done = DMG_RIPOSTED;
 			return true;
@@ -450,6 +451,7 @@ bool Mob::AvoidDamage(Mob *other, DamageHitInfo &hit)
 			float counter = (counter_block + counter_all) / 100.0f;
 			chance -= chance * counter;
 		}
+		chance = mod_block_chance(chance, attacker); // CUSTOM
 		if (zone->random.Roll(chance)) {
 			hit.damage_done = DMG_BLOCKED;
 			return true;
@@ -473,6 +475,7 @@ bool Mob::AvoidDamage(Mob *other, DamageHitInfo &hit)
 			float counter = (counter_parry + counter_all) / 100.0f;
 			chance -= chance * counter;
 		}
+		chance = mod_parry_chance(chance, attacker); // CUSTOM
 		if (zone->random.Roll(chance)) {
 			hit.damage_done = DMG_PARRIED;
 			return true;
@@ -496,6 +499,7 @@ bool Mob::AvoidDamage(Mob *other, DamageHitInfo &hit)
 			float counter = (counter_dodge + counter_all) / 100.0f;
 			chance -= chance * counter;
 		}
+		chance = mod_dodge_chance(chance, attacker); // CUSTOM
 		if (zone->random.Roll(chance)) {
 			hit.damage_done = DMG_DODGED;
 			return true;
@@ -954,6 +958,8 @@ void Mob::MeleeMitigation(Mob *attacker, DamageHitInfo &hit, ExtraAttackOptions 
 
 	Mob* defender = this;
 	auto mitigation = defender->GetMitigationAC();
+	
+	mitigation = mod_mitigation_rating(mitigation, attacker); // CUSTOM
 	if (IsClient() && attacker->IsClient())
 		mitigation = mitigation * 80 / 100; // 2004 PvP changes
 
@@ -1491,8 +1497,7 @@ bool Client::Attack(Mob* other, int Hand, bool bRiposte, bool IsStrikethrough, b
 				hate += ucDamageBonus;
 			}
 		}
-
-		// damage = mod_client_damage(damage, skillinuse, Hand, weapon, other);
+		damage = mod_client_damage(damage, skillinuse, Hand, weapon, other);
 
 		LogCombat("Damage calculated: base [{}] min damage [{}] skill [{}]", my_hit.base_damage, my_hit.min_damage, my_hit.skill);
 
@@ -1509,7 +1514,6 @@ bool Client::Attack(Mob* other, int Hand, bool bRiposte, bool IsStrikethrough, b
 		}
 
 		my_hit.tohit = GetTotalToHit(my_hit.skill, hit_chance_bonus);
-
 		DoAttack(other, my_hit, opts);
 	}
 	else {

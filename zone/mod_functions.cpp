@@ -19,6 +19,9 @@ extern Zone* zone;
 
 extern WorldServer worldserver;
 
+// Custom
+static const bool isDebug = true;
+
 //All functions that modify a value are passed the value as it was computed by default formulas and bonuses.  In most cases this should be the final value that will be used.
 
 //These are called when a zone boots or is repopped
@@ -38,7 +41,18 @@ void NPC::mod_npc_killed_merit(Mob* c) { return; }
 void NPC::mod_npc_killed(Mob* oos) { return; }
 
 //Base damage from Client::Attack - can cover myriad skill types
-int Client::mod_client_damage(int damage, EQEmu::skills::SkillType skillinuse, int hand, const EQEmu::ItemInstance* weapon, Mob* other) { return(damage); }
+// CUSTOM 
+int Client::mod_client_damage(int damage, EQEmu::skills::SkillType skillinuse, int hand, const EQEmu::ItemInstance* weapon, Mob* other) 
+{ 
+	if (isDebug) { Message(0,"Modding Melee Damage: %i", damage);}
+	float modifier = (GetSTR() / 80.0) + (GetDEX() / 160.0);
+	if (modifier > 1)
+	{
+		damage *= modifier;
+	}
+	if (isDebug) { Message(0,"Resulting Melee Damage: %i", damage);}
+	return(damage); 
+}
 
 //message is char[4096], don't screw it up. Return true for normal behavior, false to return immediately.
 // Channels:
@@ -67,7 +81,18 @@ int16 Client::mod_increase_skill_chance(int16 chance, Mob* against_who) { return
 int Client::mod_bindwound_percent(int max_percent, Mob* bindmob) { return(max_percent); }
 
 //Final bind HP value after bonuses
-int Client::mod_bindwound_hp(int bindhps, Mob* bindmob) { return(bindhps); }
+// CUSTOM
+int Client::mod_bindwound_hp(int bindhps, Mob* bindmob) 
+{ 
+	if (isDebug) { Message(0,"Modding Binding Value: %i", bindhps); }
+	float modifier = GetWIS()/30.0;
+	if (modifier > 1)
+	{
+		bindhps *= modifier;
+	}
+	if (isDebug) { Message(0,"Modded : %i", bindhps); }
+	return(bindhps); 
+}
 
 //Client haste as calculated by default formulas - In percent from 0-100
 int Client::mod_client_haste(int h) { return(h); }
@@ -82,7 +107,18 @@ void Client::mod_consider(Mob* tmob, Consider_Struct* con) { return; }
 bool Client::mod_saylink(const std::string& response, bool silentsaylink) { return(true); }
 
 //Client pet power as calculated by default formulas and bonuses
-int16 Client::mod_pet_power(int16 act_power, uint16 spell_id) { return(act_power); }
+// CUSTOM
+int16 Client::mod_pet_power(int16 act_power, uint16 spell_id) 
+{ 
+	if (isDebug) { Message(0,"Original Pet Power: %i", act_power); }
+	int modifier = GetCHA() - 80;
+	if (modifier > 0)
+	{
+		act_power += modifier;
+	}
+	if (isDebug) { Message(0,"Modded Pet Power: %i", act_power); }
+	return(act_power); 
+}
 
 //Chance to combine rolled against a random 0-99 where higher is better.
 float Client::mod_tradeskill_chance(float chance, DBTradeskillRecipe_Struct *spec) { return(chance); }
@@ -110,64 +146,467 @@ uint32 Client::mod_client_xp_for_level(uint32 xp, uint16 check_level) { return(x
 int Client::mod_food_value(const EQEmu::ItemData *item, int change) { return(change); }
 int Client::mod_drink_value(const EQEmu::ItemData *item, int change) { return(change); }
 
-//effect_vallue - Spell effect value as calculated by default formulas.  You will want to ignore effects that don't lend themselves to scaling - pet ID's, gate coords, etc.
-int Mob::mod_effect_value(int effect_value, uint16 spell_id, int effect_type, Mob* caster, uint16 caster_id) { return(effect_value); }
+//effect_value - Spell effect value as calculated by default formulas.  You will want to ignore effects that don't lend themselves to scaling - pet ID's, gate coords, etc.
+// CUSTOM
+int Mob::mod_effect_value(int effect_value, uint16 spell_id, int effect_type, Mob* caster, uint16 caster_id) 
+{ 
+	int bard_bonus = 0;
+	
+	// We really only want the caster if this is a song; otherwise, the bonus is based off of the client
+	if (IsBardSong(spell_id))
+	{
+		// Sometimes, the caster_id is passed but not the mob (Mainly bonuses like regen spells and DS)
+		if (caster == nullptr && caster_id > 0)
+		{
+			caster = entity_list.GetMob(caster_id);
+		}
+		
+		if (caster && caster->GetClass() == BARD) // Bards are special
+		{
+			bard_bonus = (GetCHA() + GetDEX() - 160)/10;
+			if (bard_bonus < 0) { bard_bonus = 0;}
+			caster->Message(0,"You're a bard! Bonus: %i", bard_bonus);
+		}
+	}
+	
+	if (isDebug)
+	{
+		switch (effect_type)
+		{
+			case SE_BardAEDot:
+				Message(0,"Modding SE_BardAEDot: %i", effect_value);
+				if (caster) { Message(0,"Caster: Modding SE_BardAEDot: %i", effect_value); }
+				break;
+			case SE_CompleteHeal:
+				Message(0,"Modding SE_CompleteHeal: %i", effect_value);
+				if (caster) { Message(0,"Caster: Modding SE_CompleteHeal: %i", effect_value); }
+				break;
+			case SE_CurrentHP:
+				Message(0,"Modding SE_CurrentHP: %i", effect_value);
+				if (caster) { Message(0,"Caster: Modding SE_CurrentHP: %i", effect_value); }
+				break;
+			case SE_CurrentHPOnce:
+				Message(0,"Modding SE_CurrentHPOnce: %i", effect_value);
+				if (caster) { Message(0,"Caster: Modding SE_CurrentHPOnce: %i", effect_value); }
+				break;
+			case SE_HealOverTime:
+				Message(0,"Modding SE_HealOverTime: %i", effect_value);
+				if (caster) { Message(0,"Caster: Modding SE_HealOverTime: %i", effect_value); }
+				break;
+			case SE_DamageShield:
+				Message(0,"Modding SE_DamageShield: %i", effect_value);
+				if (caster) { Message(0,"Caster: Modding SE_DamageShield: %i", effect_value); }
+				break;
+			case SE_Rune:
+				Message(0,"Modding SE_Rune: %i", effect_value);
+				if (caster) { Message(0,"Caster: Modding SE_Rune: %i", effect_value); }
+				break;
+			case SE_ManaRegen_v2:
+				Message(0,"Modding SE_ManaRegen_v2: %i", effect_value);
+				if (caster) { Message(0,"Caster: Modding SE_ManaRegen_v2: %i", effect_value); }
+				break;
+			case SE_CurrentMana:
+				Message(0,"Modding SE_CurrentMana: %i", effect_value);
+				if (caster) { Message(0,"Caster: Modding SE_CurrentMana: %i", effect_value); }
+				break;
+			case SE_CurrentManaOnce:
+				Message(0,"Modding SE_CurrentManaOnce: %i", effect_value);
+				if (caster) { Message(0,"Caster: Modding SE_CurrentManaOnce: %i", effect_value); }
+				break;
+			default:
+				Message(0,"Modding unknown type: %i", effect_value);
+				if (caster) { Message(0,"Caster: Modding unknown type: %i", effect_value); }
+				break;
+		}
+	}
+	// Spell effects that require a caster
+	if (caster && (caster->IsClient() || (caster->IsPet() && caster->GetOwner() && caster->GetOwner()->IsClient())))
+	{		
+		// Damage or healing spell
+		if (effect_type == SE_BardAEDot || effect_type == SE_CompleteHeal ||
+			effect_type == SE_CurrentHP || effect_type == SE_CurrentHPOnce || effect_type == SE_HealOverTime)
+		{
+			if (effect_value < 0) //Nuke or Dot
+			{
+				if (this != caster) // Only apply damage bonus if casting on someone else to avoid death from AEs and so on
+				{
+					effect_value -= bard_bonus;
+					if (caster->GetINT() > 50)
+					{
+						effect_value *= (caster->GetINT() / 50.0);
+					}			
+				}		
+			}
+			else //Heal or HoT
+			{
+				effect_value += bard_bonus;
+				if (caster->GetWIS() > 50)
+				{
+					effect_value *= (caster->GetWIS() / 50.0);
+				}
+			}
+		}
+	}
+	// Damage shields and runes are based on the target and not the caster
+	if (this->IsClient() || (this->IsPet() && this->GetOwner() && this->GetOwner()->IsClient()))
+	{
+		// SE_CurrentHP will only trigger without a caster on the first tick of a regen buff
+		if (effect_type == SE_DamageShield || effect_type == SE_Rune || (effect_type == SE_CurrentHP && caster == nullptr))
+		{
+			if (effect_value < 0)
+			{
+				effect_value -= bard_bonus;
+			}
+			else
+			{
+				effect_value += bard_bonus;
+				
+			}
+			if (GetSTA() > 80)
+			{
+				effect_value *= (GetSTA() / 80.0);
+			}	
+		}
+		else if (effect_type == SE_ManaRegen_v2 || effect_type == SE_CurrentMana || effect_type == SE_CurrentManaOnce) // Mana regen based on target's int
+		{
+			effect_value += bard_bonus;
+			if (GetINT() > 80)
+			{
+				effect_value *= (GetINT() / 80.0);
+			}
+		}
+	}
+	
+	if (isDebug)
+	{
+		if (caster) { caster->Message(0,"Caster - Modded effect value: %i", effect_value); }
+		Message(0,"Modded effect value: %i", effect_value);
+	}
+	return(effect_value); 
+}
 
 //chancetohit - 0 to 100 percent - set over 1000 for a guaranteed hit
 float Mob::mod_hit_chance(float chancetohit, EQEmu::skills::SkillType skillinuse, Mob* attacker) { return(chancetohit); }
 
 //Final riposte chance
-float Mob::mod_riposte_chance(float ripostechance, Mob* attacker) { return(ripostechance); }
+// CUSTOM 
+float Mob::mod_riposte_chance(float ripostechance, Mob* attacker) 
+{ 
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return ripostechance;
+	}
+	if (isDebug) { Message(0,"Modding riposte chance: %.2f", ripostechance); }
+	int agi = GetAGI();
+	if (agi > 80)
+	{
+		ripostechance += logf(agi - 80) / logf(5);
+	}
+	if (isDebug) { Message(0,"Modded riposte chance: %.2f", ripostechance); }
+	return(ripostechance); 
+}
 
 //Final block chance
-float Mob::mod_block_chance(float blockchance, Mob* attacker) { return(blockchance); }
+// CUSTOM
+float Mob::mod_block_chance(float blockchance, Mob* attacker) 
+{ 
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return blockchance;
+	}
+	if (isDebug) { Message(0,"Modding block chance: %.2f", blockchance); }
+	int agi = GetAGI();
+	if (agi > 80)
+	{
+		blockchance += logf(agi - 80) / logf(5);
+	}
+	if (isDebug) { Message(0,"Modded block chance: %.2f", blockchance); }
+	return(blockchance); 
+}
 
 //Final parry chance
-float Mob::mod_parry_chance(float parrychance, Mob* attacker) { return(parrychance); }
+// CUSTOM
+float Mob::mod_parry_chance(float parrychance, Mob* attacker) 
+{ 
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return parrychance;
+	}
+	if (isDebug) { Message(0,"Modding parry chance: %.2f", parrychance); }
+	int agi = GetAGI();
+	if (agi > 80)
+	{
+		parrychance += logf(agi - 80) / logf(5);
+	}
+	if (isDebug) { Message(0,"Modded parry chance: %.2f", parrychance); }
+	return(parrychance); 
+}
 
 //Final dodge chance
-float Mob::mod_dodge_chance(float dodgechance, Mob* attacker) { return(dodgechance); }
+// CUSTOM
+float Mob::mod_dodge_chance(float dodgechance, Mob* attacker) 
+{ 
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return dodgechance;
+	}
+	if (isDebug) { Message(0,"Modding dodge chance: %.2f", dodgechance); }
+	int agi = GetAGI();
+	if (agi > 80)
+	{
+		dodgechance += logf(agi - 80) / logf(5);
+	}
+	if (isDebug) { Message(0,"Modded dodge chance: %.2f", dodgechance); }
+	return(dodgechance); 
+}
 
 //Monk AC Bonus weight cap.  Defined in Combat:MonkACBonusWeight
 //Usually 15, a monk under this weight threshold gets an AC bonus
 float Mob::mod_monk_weight(float monkweight, Mob* attacker) { return(monkweight); }
 
 //Mitigation rating is compared to incoming attack rating.  Higher is better.
-float Mob::mod_mitigation_rating(float mitigation_rating, Mob* attacker) { return(mitigation_rating); }
+// CUSTOM
+float Mob::mod_mitigation_rating(float mitigation_rating, Mob* attacker) 
+{ 
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return mitigation_rating;
+	}
+	if (isDebug) { Message(0,"Modding mitigation rating: %.2f", mitigation_rating); }
+	int modifier = GetSTA() - 80;
+	if (modifier > 0)
+	{
+		mitigation_rating += modifier;
+	}
+	if (isDebug) { Message(0,"Modded mitigation rating: %.2f", mitigation_rating); }
+	return(mitigation_rating); 
+}
+
 float Mob::mod_attack_rating(float attack_rating, Mob* defender) { return(attack_rating); }
 
 //Kick damage after all other bonuses are applied
-int32 Mob::mod_kick_damage(int32 dmg) { return(dmg); }
+// CUSTOM
+int32 Mob::mod_kick_damage(int32 dmg) 
+{ 
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return dmg;
+	}
+	if (isDebug) { Message(0,"Modding kick damage: %i", dmg); }
+	float bonus = (GetSTR() / 80.0) + (GetDEX() / 160.0);
+	if (bonus > 1)
+	{
+		dmg *= bonus;
+	}
+	if (IsClient())
+	{
+		const EQEmu::ItemInstance* itm = nullptr;
+		itm = CastToClient()->GetInv().GetItem(EQEmu::invslot::slotFeet);
+		if (itm)
+			dmg += dmg * (itm->GetItem()->AC / 100.0);
+	}
+	if (isDebug) { Message(0,"Modded kick damage: %i", dmg); }
+	return(dmg); 
+}
 
 //Slam and bash damage after all other bonuses are applied
-int32 Mob::mod_bash_damage(int32 dmg) { return(dmg); }
+// CUSTOM
+int32 Mob::mod_bash_damage(int32 dmg) 
+{ 
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return dmg;
+	}
+	if (isDebug) { Message(0,"Modding bash damage: %i", dmg); }
+	float bonus = (GetSTR() / 80.0) + (GetDEX() / 160.0);
+	if (bonus > 1)
+	{
+		dmg *= bonus;
+	}
+	if (IsClient())
+	{
+		const EQEmu::ItemInstance* itm = nullptr;
+		itm = CastToClient()->GetInv().GetItem(EQEmu::invslot::slotSecondary);
+		if (itm)
+			dmg += dmg * (itm->GetItem()->AC / 100.0);
+	}
+	if (isDebug) { Message(0,"Modded bash damage: %i", dmg); }
+	return(dmg); 
+}
 
 //Frenzy damage after all other bonuses are applied
-int32 Mob::mod_frenzy_damage(int32 dmg) { return(dmg); }
+// CUSTOM
+int32 Mob::mod_frenzy_damage(int32 dmg) 
+{
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return dmg;
+	}
+	if (isDebug) { Message(0,"Modding frenzy damage: %i", dmg); }
+	float bonus = (GetSTR() / 80.0) + (GetDEX() / 160.0);
+	if (bonus > 1)
+	{
+		dmg *= bonus;
+	}
+	if (isDebug) { Message(0,"Modded frenzy damage: %i", dmg); }
+	return(dmg); 
+}
 
 //Special attack damage after all other bonuses are applied.
-int32 Mob::mod_monk_special_damage(int32 ndamage, EQEmu::skills::SkillType skill_type) { return(ndamage); }
+// CUSTOM
+int32 Mob::mod_monk_special_damage(int32 ndamage, EQEmu::skills::SkillType skill_type) 
+{ 
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return ndamage;
+	}
+	if (isDebug) { Message(0,"Modding monk damage: %i", ndamage); }
+	float bonus = (GetSTR() / 80.0) + (GetDEX() / 160.0);
+	if (bonus > 1)
+	{
+		ndamage *= bonus;
+	}
+	if (IsClient())
+	{
+		const EQEmu::ItemInstance* itm = nullptr;
+		switch (skill_type)
+		{
+			case EQEmu::skills::SkillTigerClaw:
+			case EQEmu::skills::SkillDragonPunch :
+			case EQEmu::skills::SkillEagleStrike:
+				itm = CastToClient()->GetInv().GetItem(EQEmu::invslot::slotHands);
+				if (itm)
+					ndamage += ndamage * (itm->GetItem()->AC / 100.0);
+				break;
+			case EQEmu::skills::SkillFlyingKick:
+			case EQEmu::skills::SkillRoundKick:
+				itm = CastToClient()->GetInv().GetItem(EQEmu::invslot::slotFeet);
+				if (itm)
+					ndamage += ndamage * (itm->GetItem()->AC / 100.0);
+				break;
+		}
+	}
+	if (isDebug) { Message(0,"Modded monk damage: %i", ndamage); }
+	return(ndamage); 
+}
 
 //ndamage - Backstab damage as calculated by default formulas
-int32 Mob::mod_backstab_damage(int32 ndamage) { return(ndamage); }
+// CUSTOM
+int32 Mob::mod_backstab_damage(int32 ndamage) 
+{ 
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return ndamage;
+	}
+	if (isDebug) { Message(0,"Modding backstab damage: %i", ndamage); }
+	float bonus = (GetDEX() / 80.0) + (GetSTR() / 160.0);
+	if (bonus > 1)
+	{
+		ndamage *= bonus;
+	}
+	if (isDebug) { Message(0,"Modded backstab damage: %i", ndamage); }
+	return(ndamage); 
+}
 
 //Chance for 50+ archery bonus damage if Combat:UseArcheryBonusRoll is true.  Base is Combat:ArcheryBonusChance
 int Mob::mod_archery_bonus_chance(int bonuschance, const EQEmu::ItemInstance* RangeWeapon) { return(bonuschance); }
 
 //Archery bonus damage
-uint32 Mob::mod_archery_bonus_damage(uint32 MaxDmg, const EQEmu::ItemInstance* RangeWeapon) { return(MaxDmg); }
+// CUSTOM
+uint32 Mob::mod_archery_bonus_damage(uint32 MaxDmg, const EQEmu::ItemInstance* RangeWeapon) 
+{ 
+	// // This gets modified again in mod_archery_damage. This could be useful if rangers suck
+	// if (!(IsClient() || (IsPet() && GetOwner()->IsClient())))
+	// {
+		// return MaxDmg;
+	// }
+	// Message(0,"Modding bow bonus damage: %i", MaxDmg);
+	// float bonus = (GetDEX() / 100.0) + (GetSTR() / 300.0);
+	// if (bonus > 1)
+	// {
+		// MaxDmg *= bonus;
+	// }
+	// Message(0,"Modded value: %i", MaxDmg);
+	return(MaxDmg); 
+}
 
 //Final archery damage including bonus if it was applied.
-int32 Mob::mod_archery_damage(int32 TotalDmg, bool hasbonus, const EQEmu::ItemInstance* RangeWeapon) { return(TotalDmg); }
+// CUSTOM
+int32 Mob::mod_archery_damage(int32 TotalDmg, bool hasbonus, const EQEmu::ItemInstance* RangeWeapon) 
+{ 
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return TotalDmg;
+	}
+	if (isDebug) { Message(0,"Modding archery damage: %i", TotalDmg); }
+	float bonus = (GetDEX() / 80.0) + (GetSTR() / 250.0);
+	if (bonus > 1)
+	{
+		TotalDmg *= bonus;
+	}
+	if (isDebug) { Message(0,"Modded archery damage: %i", TotalDmg); }
+	return(TotalDmg); 
+}
 
 //Thrown weapon damage after all other calcs
-uint16 Mob::mod_throwing_damage(uint16 MaxDmg) { return(MaxDmg); }
+// CUSTOM
+uint16 Mob::mod_throwing_damage(uint16 MaxDmg) 
+{
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return MaxDmg;
+	}
+	if (isDebug) { Message(0,"Modding throwing damage: %i", MaxDmg); }
+	float bonus = (GetDEX() / 80.0) + (GetSTR() / 250.0);
+	if (bonus > 1)
+	{
+		MaxDmg *= bonus;
+	}
+	if (isDebug) { Message(0,"Modded throwing damage: %i", MaxDmg); }
+	return(MaxDmg); 
+}
 
 //Spell cast time in milliseconds - will not sync with client cast time bar, but does work.
-int32 Mob::mod_cast_time(int32 cast_time) { return(cast_time); }
+// CUSTOM
+int32 Mob::mod_cast_time(int32 cast_time) 
+{ 
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return cast_time;
+	}
+	if (isDebug) { Message(0,"Modding cast time: %i", cast_time); }
+	float modifier = GetDEX() / 100.0;
+	if (modifier > 1)
+	{
+		cast_time /= modifier;
+	}
+	if (isDebug) { Message(0,"Modded cast time: %i", cast_time); }
+	return(cast_time); 
+}
 
 //res - Default buff duration formula
-int Mob::mod_buff_duration(int res, Mob* caster, Mob* target, uint16 spell_id) { return(res); }
+// CUSTOM
+int Mob::mod_buff_duration(int res, Mob* caster, Mob* target, uint16 spell_id) 
+{ 
+	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
+	{
+		return res;
+	}
+	if (isDebug) { Message(0,"Modding buff duration: %i", res); }
+	if (IsBeneficialSpell(spell_id))
+	{
+		if (caster)
+		{
+			float modifier = (caster->GetWIS() + caster->GetINT())/200.0;
+			if (modifier > 1)
+			{
+				res *= modifier;
+			}
+		}
+	}
+	if (isDebug) { Message(0,"Modded buff duration: %i", res); }
+	return(res); 
+}
 
 //Spell stack override - If this returns anything < 2, it will ignore all other stacking rules.
 // See spells.cpp: Mob::CheckStackConflict
