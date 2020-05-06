@@ -1497,8 +1497,8 @@ bool Client::Attack(Mob* other, int Hand, bool bRiposte, bool IsStrikethrough, b
 				hate += ucDamageBonus;
 			}
 		}
-		damage = mod_client_damage(damage, skillinuse, Hand, weapon, other);
 
+		// damage = mod_client_damage(damage, skillinuse, Hand, weapon, other);
 		LogCombat("Damage calculated: base [{}] min damage [{}] skill [{}]", my_hit.base_damage, my_hit.min_damage, my_hit.skill);
 
 		int hit_chance_bonus = 0;
@@ -1514,6 +1514,9 @@ bool Client::Attack(Mob* other, int Hand, bool bRiposte, bool IsStrikethrough, b
 		}
 
 		my_hit.tohit = GetTotalToHit(my_hit.skill, hit_chance_bonus);
+		
+		my_hit.min_damage = mod_client_damage(my_hit.min_damage, my_hit.skill, Hand, weapon, other); // CUSTOM 
+		my_hit.base_damage = mod_client_damage(my_hit.base_damage, my_hit.skill, Hand, weapon, other); // CUSTOM
 		DoAttack(other, my_hit, opts);
 	}
 	else {
