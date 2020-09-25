@@ -9,7 +9,7 @@ class Spawn2;
 struct Consider_Struct;
 struct DBTradeskillRecipe_Struct;
 
-namespace EQEmu
+namespace EQ
 {
 	class ItemInstance;
 }
@@ -32,7 +32,7 @@ void Zone::mod_repop() { return; }
 void NPC::mod_prespawn(Spawn2 *sp) { return; }
 
 //Base damage from NPC::Attack
-int NPC::mod_npc_damage(int damage, EQEmu::skills::SkillType skillinuse, int hand, const EQEmu::ItemData* weapon, Mob* other) { return(damage); }
+int NPC::mod_npc_damage(int damage, EQ::skills::SkillType skillinuse, int hand, const EQ::ItemData* weapon, Mob* other) { return(damage); }
 
 //Mob c has been given credit for a kill.  This is called after the regular EVENT_KILLED_MERIT event.
 void NPC::mod_npc_killed_merit(Mob* c) { return; }
@@ -41,8 +41,9 @@ void NPC::mod_npc_killed_merit(Mob* c) { return; }
 void NPC::mod_npc_killed(Mob* oos) { return; }
 
 //Base damage from Client::Attack - can cover myriad skill types
+
 // CUSTOM 
-int Client::mod_client_damage(int damage, EQEmu::skills::SkillType skillinuse, int hand, const EQEmu::ItemInstance* weapon, Mob* other) 
+int Client::mod_client_damage(int damage, EQ::skills::SkillType skillinuse, int hand, const EQ::ItemInstance* weapon, Mob* other)
 { 
 	if (isDebug) { Message(0,"Modding Melee Damage: %i", damage);}
 	float modifier = (GetSTR() / 80.0) + (GetDEX() / 160.0);
@@ -72,7 +73,7 @@ bool Client::mod_client_message(char* message, uint8 chan_num) { return(true); }
 
 //Skillup override.  When this is called the regular skillup check has failed.  Return false to proceed with default behavior.
 //This will NOT allow a client to increase skill past a cap.
-bool Client::mod_can_increase_skill(EQEmu::skills::SkillType skillid, Mob* against_who) { return(false); }
+bool Client::mod_can_increase_skill(EQ::skills::SkillType skillid, Mob* against_who) { return(false); }
 
 //chance of general skill increase, rolled against 0-99 where higher chance is better.
 int16 Client::mod_increase_skill_chance(int16 chance, Mob* against_who) { return(chance); }
@@ -127,7 +128,7 @@ float Client::mod_tradeskill_chance(float chance, DBTradeskillRecipe_Struct *spe
 float Client::mod_tradeskill_skillup(float chance_stage2) { return(chance_stage2); }
 
 //Tribute value override
-int32 Client::mod_tribute_item_value(int32 pts, const EQEmu::ItemInstance* item) { return(pts); }
+int32 Client::mod_tribute_item_value(int32 pts, const EQ::ItemInstance* item) { return(pts); }
 
 //Death reporting
 void Client::mod_client_death_npc(Mob* killerMob) { return; }
@@ -143,8 +144,8 @@ int32 Client::mod_client_xp(int32 in_xp, NPC *npc) { return(in_xp); }
 uint32 Client::mod_client_xp_for_level(uint32 xp, uint16 check_level) { return(xp); }
 
 //Food and drink values as computed by consume requests.  Return < 0 to abort the request.
-int Client::mod_food_value(const EQEmu::ItemData *item, int change) { return(change); }
-int Client::mod_drink_value(const EQEmu::ItemData *item, int change) { return(change); }
+int Client::mod_food_value(const EQ::ItemData *item, int change) { return(change); }
+int Client::mod_drink_value(const EQ::ItemData *item, int change) { return(change); }
 
 //effect_value - Spell effect value as calculated by default formulas.  You will want to ignore effects that don't lend themselves to scaling - pet ID's, gate coords, etc.
 // CUSTOM
@@ -286,7 +287,7 @@ int Mob::mod_effect_value(int effect_value, uint16 spell_id, int effect_type, Mo
 }
 
 //chancetohit - 0 to 100 percent - set over 1000 for a guaranteed hit
-float Mob::mod_hit_chance(float chancetohit, EQEmu::skills::SkillType skillinuse, Mob* attacker) { return(chancetohit); }
+float Mob::mod_hit_chance(float chancetohit, EQ::skills::SkillType skillinuse, Mob* attacker) { return(chancetohit); }
 
 //Final riposte chance
 // CUSTOM 
@@ -454,7 +455,7 @@ int32 Mob::mod_frenzy_damage(int32 dmg)
 
 //Special attack damage after all other bonuses are applied.
 // CUSTOM
-int32 Mob::mod_monk_special_damage(int32 ndamage, EQEmu::skills::SkillType skill_type) 
+int32 Mob::mod_monk_special_damage(int32 ndamage, EQ::skills::SkillType skill_type
 { 
 	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
 	{
@@ -509,11 +510,11 @@ int32 Mob::mod_backstab_damage(int32 ndamage)
 }
 
 //Chance for 50+ archery bonus damage if Combat:UseArcheryBonusRoll is true.  Base is Combat:ArcheryBonusChance
-int Mob::mod_archery_bonus_chance(int bonuschance, const EQEmu::ItemInstance* RangeWeapon) { return(bonuschance); }
+int Mob::mod_archery_bonus_chance(int bonuschance, const EQ::ItemInstance* RangeWeapon) { return(bonuschance); }
 
 //Archery bonus damage
 // CUSTOM
-uint32 Mob::mod_archery_bonus_damage(uint32 MaxDmg, const EQEmu::ItemInstance* RangeWeapon) 
+uint32 Mob::mod_archery_bonus_damage(uint32 MaxDmg, const EQ::ItemInstance* RangeWeapon)
 { 
 	// // This gets modified again in mod_archery_damage. This could be useful if rangers suck
 	// if (!(IsClient() || (IsPet() && GetOwner()->IsClient())))
@@ -532,7 +533,7 @@ uint32 Mob::mod_archery_bonus_damage(uint32 MaxDmg, const EQEmu::ItemInstance* R
 
 //Final archery damage including bonus if it was applied.
 // CUSTOM
-int32 Mob::mod_archery_damage(int32 TotalDmg, bool hasbonus, const EQEmu::ItemInstance* RangeWeapon) 
+int32 Mob::mod_archery_damage(int32 TotalDmg, bool hasbonus, const EQ::ItemInstance* RangeWeapon)
 { 
 	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
 	{
