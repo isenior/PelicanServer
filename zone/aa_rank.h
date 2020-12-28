@@ -39,6 +39,7 @@ public:
 	int spell;
 	int spell_type;
 	int recast_time;
+	int spell_effect_value;
 	int prev_id;
 	Rank *prev;
 	int next_id;

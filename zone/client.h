@@ -760,7 +760,7 @@ public:
 
 	void SendTradeskillSearchResults(const std::string &query, unsigned long objtype, unsigned long someid);
 	void SendTradeskillDetails(uint32 recipe_id);
-	bool TradeskillExecute(DBTradeskillRecipe_Struct *spec);
+	bool TradeskillExecute(DBTradeskillRecipe_Struct *spec, uint32 augment_id = 0);
 	void CheckIncreaseTradeskill(int16 bonusstat, int16 stat_modifier, float skillup_modifier, uint16 success_modifier, EQ::skills::SkillType tradeskill);
 	void InitInnates();
 

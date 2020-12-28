@@ -320,19 +320,19 @@ public:
 	virtual bool CastSpell(uint16 spell_id, uint16 target_id, EQ::spells::CastingSlot slot = EQ::spells::CastingSlot::Item, int32 casttime = -1,
 		int32 mana_cost = -1, uint32* oSpellWillFinish = 0, uint32 item_slot = 0xFFFFFFFF,
 		uint32 timer = 0xFFFFFFFF, uint32 timer_duration = 0, int16 *resist_adjust = nullptr,
-		uint32 aa_id = 0);
+		uint32 aa_id = 0, int32 spell_effect_value = 0);
 	virtual bool DoCastSpell(uint16 spell_id, uint16 target_id, EQ::spells::CastingSlot slot = EQ::spells::CastingSlot::Item, int32 casttime = -1,
 		int32 mana_cost = -1, uint32* oSpellWillFinish = 0, uint32 item_slot = 0xFFFFFFFF,
 		uint32 timer = 0xFFFFFFFF, uint32 timer_duration = 0, int16 resist_adjust = 0,
-		uint32 aa_id = 0);
+		uint32 aa_id = 0, int32 spell_effect_value = 0);
 	void CastedSpellFinished(uint16 spell_id, uint32 target_id, EQ::spells::CastingSlot slot, uint16 mana_used,
-		uint32 inventory_slot = 0xFFFFFFFF, int16 resist_adjust = 0);
+		uint32 inventory_slot = 0xFFFFFFFF, int16 resist_adjust = 0, int32 spell_effect_value = 0);
 	bool SpellFinished(uint16 spell_id, Mob *target, EQ::spells::CastingSlot slot = EQ::spells::CastingSlot::Item, uint16 mana_used = 0,
-		uint32 inventory_slot = 0xFFFFFFFF, int16 resist_adjust = 0, bool isproc = false, int level_override = -1);
+		uint32 inventory_slot = 0xFFFFFFFF, int16 resist_adjust = 0, bool isproc = false, int level_override = -1, int32 spell_effect_value = 0);
 	void SendBeginCast(uint16 spell_id, uint32 casttime);
 	virtual bool SpellOnTarget(uint16 spell_id, Mob* spelltar, bool reflect = false,
-		bool use_resist_adjust = false, int16 resist_adjust = 0, bool isproc = false, int level_override = -1);
-	virtual bool SpellEffect(Mob* caster, uint16 spell_id, float partial = 100, int level_override = -1);
+		bool use_resist_adjust = false, int16 resist_adjust = 0, bool isproc = false, int level_override = -1, int32 spell_effect_value = 0);
+	virtual bool SpellEffect(Mob* caster, uint16 spell_id, float partial = 100, int level_override = -1, int32 spell_effect_value = 0);
 	virtual bool DetermineSpellTargets(uint16 spell_id, Mob *&spell_target, Mob *&ae_center,
 		CastAction_type &CastAction, EQ::spells::CastingSlot slot, bool isproc = false);
 	virtual bool CheckFizzle(uint16 spell_id);
@@ -1407,6 +1407,7 @@ protected:
 	EQ::spells::CastingSlot casting_spell_slot;
 	uint16 casting_spell_mana;
 	uint32 casting_spell_inventory_slot;
+	uint32 casting_spell_effect_value;
 	uint32 casting_spell_timer;
 	uint32 casting_spell_timer_duration;
 	uint32 casting_spell_type;

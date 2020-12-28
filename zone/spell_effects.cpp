@@ -46,7 +46,7 @@ extern WorldServer worldserver;
 
 // the spell can still fail here, if the buff can't stack
 // in this case false will be returned, true otherwise
-bool Mob::SpellEffect(Mob* caster, uint16 spell_id, float partial, int level_override)
+bool Mob::SpellEffect(Mob* caster, uint16 spell_id, float partial, int level_override, int32 spell_effect_value)
 {
 	int caster_level, buffslot, effect, effect_value, i;
 	EQ::ItemInstance *SummonedItem=nullptr;
@@ -1152,17 +1152,20 @@ bool Mob::SpellEffect(Mob* caster, uint16 spell_id, float partial, int level_ove
 
 			case SE_SummonItem:
 			{
-				const EQ::ItemData *item = database.GetItem(spell.base[i]);
+				// Custom - Allow specifying spell effect value
+				int base_value = (i == 0 && spell_effect_value != 0) ? spell_effect_value : spell.base[i];
+				
+				const EQ::ItemData *item = database.GetItem(base_value);
 #ifdef SPELL_EFFECT_SPAM
 				const char *itemname = item ? item->Name : "*Unknown Item*";
-				snprintf(effect_desc, _EDLEN, "Summon Item: %s (id %d)", itemname, spell.base[i]);
+				snprintf(effect_desc, _EDLEN, "Summon Item: %s (id %d)", itemname, base_value);
 #endif
 				if (!item) {
-					Message(Chat::Red, "Unable to summon item %d. Item not found.", spell.base[i]);
+					Message(Chat::Red, "Unable to summon item %d. Item not found.", base_value);
 				} else if (IsClient()) {
 					Client *c = CastToClient();
 					if (c->CheckLoreConflict(item)) {
-						c->DuplicateLoreMessage(spell.base[i]);
+						c->DuplicateLoreMessage(base_value);
 					} else {
 						int charges;
 						if (item->Stackable)
@@ -1180,7 +1183,7 @@ bool Mob::SpellEffect(Mob* caster, uint16 spell_id, float partial, int level_ove
 							c->SendItemPacket(EQ::invslot::slotCursor, SummonedItem, ItemPacketLimbo);
 							safe_delete(SummonedItem);
 						}
-						SummonedItem = database.CreateItem(spell.base[i], charges);
+						SummonedItem = database.CreateItem(base_value, charges);
 					}
 				}
 

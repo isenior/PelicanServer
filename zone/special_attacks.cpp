@@ -875,7 +875,7 @@ void Mob::DoArcheryAttackDmg(Mob *other, const EQ::ItemInstance *RangeWeapon, co
 		my_hit.skill = EQ::skills::SkillArchery;
 		my_hit.offense = offense(my_hit.skill);
 		my_hit.tohit = GetTotalToHit(my_hit.skill, chance_mod);
-		my_hit.hand = EQ::invslot::slotRange
+		my_hit.hand = EQ::invslot::slotRange;
 		my_hit.base_damage = mod_archery_damage(my_hit.base_damage, false, RangeWeapon); // CUSTOM
 
 		DoAttack(other, my_hit);

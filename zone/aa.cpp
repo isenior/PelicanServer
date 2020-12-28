@@ -1251,7 +1251,10 @@ void Client::ActivateAlternateAdvancementAbility(int rank_id, int target_id) {
 		}
 		ExpendAlternateAdvancementCharge(ability->id);
 	} else {
-		if(!CastSpell(rank->spell, target_id, EQ::spells::CastingSlot::AltAbility, -1, -1, 0, -1, rank->spell_type + pTimerAAStart, cooldown, nullptr, rank->id)) {
+		// Custom 
+		// Load the spell effect value to pass. This will allow overriding what's in the spell itself
+		
+		if(!CastSpell(rank->spell, target_id, EQ::spells::CastingSlot::AltAbility, -1, -1, 0, -1, rank->spell_type + pTimerAAStart, cooldown, nullptr, rank->id, rank->spell_effect_value)) {
 			return;
 		}
 	}
@@ -1698,7 +1701,7 @@ bool ZoneDatabase::LoadAlternateAdvancementAbilities(std::unordered_map<int, std
 	LogInfo("Loading Alternate Advancement Ability Ranks");
 	ranks.clear();
 	query = "SELECT id, upper_hotkey_sid, lower_hotkey_sid, title_sid, desc_sid, cost, level_req, spell, spell_type, recast_time, "
-		"next_id, expansion FROM aa_ranks";
+		"next_id, expansion, spell_effect_value FROM aa_ranks";
 	results = QueryDatabase(query);
 	if(results.Success()) {
 		for(auto row = results.begin(); row != results.end(); ++row) {
@@ -1715,6 +1718,7 @@ bool ZoneDatabase::LoadAlternateAdvancementAbilities(std::unordered_map<int, std
 			rank->recast_time = atoi(row[9]);
 			rank->next_id = atoi(row[10]);
 			rank->expansion = atoi(row[11]);
+			rank->spell_effect_value = atoi(row[12]);
 			rank->base_ability = nullptr;
 			rank->total_cost = 0;
 			rank->prev_id = -1;

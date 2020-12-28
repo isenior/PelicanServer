@@ -128,7 +128,7 @@ void Mob::SpellProcess()
 		spellend_timer.Disable();
 		delaytimer = false;
 		CastedSpellFinished(casting_spell_id, casting_spell_targetid, casting_spell_slot,
-			casting_spell_mana, casting_spell_inventory_slot, casting_spell_resist_adjust);
+			casting_spell_mana, casting_spell_inventory_slot, casting_spell_resist_adjust, casting_spell_effect_value);
 	}
 
 }
@@ -157,7 +157,7 @@ void NPC::SpellProcess()
 bool Mob::CastSpell(uint16 spell_id, uint16 target_id, CastingSlot slot,
 	int32 cast_time, int32 mana_cost, uint32* oSpellWillFinish, uint32 item_slot,
 	uint32 timer, uint32 timer_duration, int16 *resist_adjust,
-	uint32 aa_id)
+	uint32 aa_id, int32 spell_effect_value) // Custom optional spell_effect_value parameter
 {
 	LogSpells("CastSpell called for spell [{}] ([{}]) on entity [{}], slot [{}], time [{}], mana [{}], from item slot [{}]",
 		(IsValidSpell(spell_id))?spells[spell_id].name:"UNKNOWN SPELL", spell_id, target_id, static_cast<int>(slot), cast_time, mana_cost, (item_slot==0xFFFFFFFF)?999:item_slot);
@@ -314,11 +314,11 @@ bool Mob::CastSpell(uint16 spell_id, uint16 target_id, CastingSlot slot,
 
 	if(resist_adjust)
 	{
-		return(DoCastSpell(spell_id, target_id, slot, cast_time, mana_cost, oSpellWillFinish, item_slot, timer, timer_duration, *resist_adjust, aa_id));
+		return(DoCastSpell(spell_id, target_id, slot, cast_time, mana_cost, oSpellWillFinish, item_slot, timer, timer_duration, *resist_adjust, aa_id, spell_effect_value));
 	}
 	else
 	{
-		return(DoCastSpell(spell_id, target_id, slot, cast_time, mana_cost, oSpellWillFinish, item_slot, timer, timer_duration, spells[spell_id].ResistDiff, aa_id));
+		return(DoCastSpell(spell_id, target_id, slot, cast_time, mana_cost, oSpellWillFinish, item_slot, timer, timer_duration, spells[spell_id].ResistDiff, aa_id, spell_effect_value));
 	}
 }
 
@@ -333,7 +333,7 @@ bool Mob::CastSpell(uint16 spell_id, uint16 target_id, CastingSlot slot,
 bool Mob::DoCastSpell(uint16 spell_id, uint16 target_id, CastingSlot slot,
 					int32 cast_time, int32 mana_cost, uint32* oSpellWillFinish,
 					uint32 item_slot, uint32 timer, uint32 timer_duration,
-					int16 resist_adjust, uint32 aa_id)
+					int16 resist_adjust, uint32 aa_id, int32 spell_effect_value)
 {
 	Mob* pMob = nullptr;
 	int32 orgcasttime;
@@ -351,6 +351,7 @@ bool Mob::DoCastSpell(uint16 spell_id, uint16 target_id, CastingSlot slot,
 	casting_spell_id = spell_id;
 	casting_spell_slot = slot;
 	casting_spell_inventory_slot = item_slot;
+	casting_spell_effect_value = spell_effect_value;
 	if(casting_spell_timer != 0xFFFFFFFF)
 	{
 		casting_spell_timer = timer;
@@ -495,7 +496,7 @@ bool Mob::DoCastSpell(uint16 spell_id, uint16 target_id, CastingSlot slot,
 			StopCasting();
 			return false;
 		}
-		CastedSpellFinished(spell_id, target_id, slot, mana_cost, item_slot, resist_adjust);
+		CastedSpellFinished(spell_id, target_id, slot, mana_cost, item_slot, resist_adjust, spell_effect_value);
 		return(true);
 	}
 
@@ -965,7 +966,7 @@ void Mob::StopCasting()
 // just check timed spell specific things before passing off to SpellFinished
 // which figures out proper targets etc
 void Mob::CastedSpellFinished(uint16 spell_id, uint32 target_id, CastingSlot slot,
-							uint16 mana_used, uint32 inventory_slot, int16 resist_adjust)
+							uint16 mana_used, uint32 inventory_slot, int16 resist_adjust, int32 spell_effect_value)
 {
 	bool IsFromItem = false;
 	EQ::ItemInstance *item = nullptr;
@@ -1377,7 +1378,7 @@ void Mob::CastedSpellFinished(uint16 spell_id, uint32 target_id, CastingSlot slo
 	}
 
 	// we're done casting, now try to apply the spell
-	if( !SpellFinished(spell_id, spell_target, slot, mana_used, inventory_slot, resist_adjust) )
+	if( !SpellFinished(spell_id, spell_target, slot, mana_used, inventory_slot, resist_adjust, false, -1, spell_effect_value) )
 	{
 		LogSpells("Casting of [{}] canceled: SpellFinished returned false", spell_id);
 		// most of the cases we return false have a message already or are logic errors that shouldn't happen
@@ -2034,7 +2035,7 @@ bool Mob::DetermineSpellTargets(uint16 spell_id, Mob *&spell_target, Mob *&ae_ce
 // we can't interrupt in this, or anything called from this!
 // if you need to abort the casting, return false
 bool Mob::SpellFinished(uint16 spell_id, Mob *spell_target, CastingSlot slot, uint16 mana_used,
-						uint32 inventory_slot, int16 resist_adjust, bool isproc, int level_override)
+						uint32 inventory_slot, int16 resist_adjust, bool isproc, int level_override, int32 spell_effect_value)
 {
 	//EQApplicationPacket *outapp = nullptr;
 	Mob *ae_center = nullptr;
@@ -2218,14 +2219,14 @@ bool Mob::SpellFinished(uint16 spell_id, Mob *spell_target, CastingSlot slot, ui
 				return(false);
 			}
 			if (isproc) {
-				SpellOnTarget(spell_id, spell_target, false, true, resist_adjust, true, level_override);
+				SpellOnTarget(spell_id, spell_target, false, true, resist_adjust, true, level_override, spell_effect_value);
 			} else {
 				if (spells[spell_id].targettype == ST_TargetOptional){
 					if (!TrySpellProjectile(spell_target, spell_id))
 						return false;
 				}
 
-				else if(!SpellOnTarget(spell_id, spell_target, false, true, resist_adjust, false, level_override)) {
+				else if(!SpellOnTarget(spell_id, spell_target, false, true, resist_adjust, false, level_override, spell_effect_value)) {
 					if(IsBuffSpell(spell_id) && IsBeneficialSpell(spell_id)) {
 						// Prevent mana usage/timers being set for beneficial buffs
 						if(casting_spell_aa_id)
@@ -3424,7 +3425,7 @@ int Mob::CanBuffStack(uint16 spellid, uint8 caster_level, bool iFailIfOverwrite)
 // break stuff
 //
 bool Mob::SpellOnTarget(uint16 spell_id, Mob *spelltar, bool reflect, bool use_resist_adjust, int16 resist_adjust,
-			bool isproc, int level_override)
+			bool isproc, int level_override, int32 spell_effect_value)
 {
 
 	bool is_damage_or_lifetap_spell = IsDamageSpell(spell_id) || IsLifetapSpell(spell_id);
@@ -3821,7 +3822,7 @@ bool Mob::SpellOnTarget(uint16 spell_id, Mob *spelltar, bool reflect, bool use_r
 			// caster actually appears to change
 			// ex. During OMM fight you click your reflect mask and you get the recourse from the reflected
 			// spell
-			spelltar->SpellOnTarget(spell_id, this, true, use_resist_adjust, resist_adjust);
+			spelltar->SpellOnTarget(spell_id, this, true, use_resist_adjust, resist_adjust, spell_effect_value);
 			safe_delete(action_packet);
 			return false;
 		}
@@ -3922,7 +3923,7 @@ bool Mob::SpellOnTarget(uint16 spell_id, Mob *spelltar, bool reflect, bool use_r
 	}
 
 	// cause the effects to the target
-	if(!spelltar->SpellEffect(this, spell_id, spell_effectiveness, level_override))
+	if(!spelltar->SpellEffect(this, spell_id, spell_effectiveness, level_override, spell_effect_value))
 	{
 		// if SpellEffect returned false there's a problem applying the
 		// spell. It's most likely a buff that can't stack.

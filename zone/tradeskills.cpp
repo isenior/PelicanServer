@@ -453,7 +453,66 @@ void Object::HandleCombine(Client* user, const NewCombine_Struct* in_combine, Ob
 	auto outapp = new EQApplicationPacket(OP_TradeSkillCombine, 0);
 	user->QueuePacket(outapp);
 	safe_delete(outapp);
-
+	
+	// Custom - Store off the stats of the components if appropriate
+	std::map<std::string, int> componentStats = {
+		{"agility", 0},
+		{"charisma", 0},
+		{"dexterity", 0},
+		{"intelligence", 0},
+		{"stamina", 0},
+		{"strength", 0},
+		{"wisdom", 0},
+		{"hp", 0},
+		{"mana", 0},
+		{"ac", 0},
+		{"damage", 0},
+		{"delay", 0},
+	};
+	
+	uint32 augment_id;
+	
+	if (spec.use_augment_system)
+	{
+		for (uint8 i = EQ::invbag::SLOT_BEGIN; i < EQ::invtype::WORLD_SIZE; i++) 
+		{
+			const EQ::ItemInstance* inst = container->GetItem(i);
+			if (inst) 
+			{
+				componentStats["agility"] += inst->GetItemAgi(true);
+				componentStats["charisma"] += inst->GetItemCha(true);
+				componentStats["dexterity"] += inst->GetItemDex(true);
+				componentStats["intelligence"] += inst->GetItemInt(true);
+				componentStats["stamina"] += inst->GetItemSta(true);
+				componentStats["strength"] += inst->GetItemStr(true);
+				componentStats["wisdom"] += inst->GetItemWis(true);
+				componentStats["hp"] += inst->GetItemHP(true);
+				componentStats["mana"] += inst->GetItemMana(true);
+				componentStats["ac"] += inst->GetItemArmorClass(true);
+				componentStats["damage"] += inst->GetItemWeaponDamage(true);				
+			}
+		}
+		
+		std::string query = StringFormat(
+		"SELECT "
+		"id "
+		"FROM "
+		"`items` "
+		"WHERE "
+		"aagi=%i AND acha=%i AND adex=%i AND aint=%i AND asta=%i AND astr=%i AND awis=%i AND hp=%i AND mana=%i AND ac=%i AND damage=%i "
+		"AND name=\"Secret Jewel\"", componentStats["agility"],componentStats["charisma"],componentStats["dexterity"],componentStats["intelligence"],
+		componentStats["stamina"],componentStats["strength"],componentStats["wisdom"],componentStats["hp"],componentStats["mana"],
+		componentStats["ac"],componentStats["damage"]);
+		
+		MySQLRequestResult results = database.QueryDatabase(query);
+	
+		for(auto row = results.begin(); row != results.end(); ++row) 
+		{
+			augment_id = atoi(row[0]);
+		}
+	}
+	
+	
 	//now clean out the containers.
 	if(worldcontainer){
 		container->Clear();
@@ -473,7 +532,7 @@ void Object::HandleCombine(Client* user, const NewCombine_Struct* in_combine, Ob
 		container->Clear();
 	}
 	//do the check and send results...
-	bool success = user->TradeskillExecute(&spec);
+	bool success = user->TradeskillExecute(&spec, augment_id);
 
 	// Learn new recipe message
 	// Update Made count
@@ -611,6 +670,22 @@ void Object::HandleAutoCombine(Client* user, const RecipeAutoCombine_Struct* rac
 
 		return;
 	}
+	
+	// Custom - Store off the stats of the components
+	std::map<std::string, int> componentStats = {
+		{"agility", 0},
+		{"charisma", 0},
+		{"dexterity", 0},
+		{"intelligence", 0},
+		{"stamina", 0},
+		{"strength", 0},
+		{"wisdom", 0},
+		{"hp", 0},
+		{"mana", 0},
+		{"ac", 0},
+		{"damage", 0},
+		{"delay", 0},
+	};
 
 	//now we know they have everything...
 
@@ -633,6 +708,19 @@ void Object::HandleAutoCombine(Client* user, const RecipeAutoCombine_Struct* rac
 			}
 
 			const EQ::ItemInstance* inst = user_inv.GetItem(slot);
+			
+			// Custom - Add stats to dictionary
+			componentStats["agility"] += inst->GetItemAgi(true);
+			componentStats["charisma"] += inst->GetItemCha(true);
+			componentStats["dexterity"] += inst->GetItemDex(true);
+			componentStats["intelligence"] += inst->GetItemInt(true);
+			componentStats["stamina"] += inst->GetItemSta(true);
+			componentStats["strength"] += inst->GetItemStr(true);
+			componentStats["wisdom"] += inst->GetItemWis(true);
+			componentStats["hp"] += inst->GetItemHP(true);
+			componentStats["mana"] += inst->GetItemMana(true);
+			componentStats["ac"] += inst->GetItemArmorClass(true);
+			componentStats["damage"] += inst->GetItemWeaponDamage(true);	
 
 			if (inst && !inst->IsStackable())
 				user->DeleteItemInInventory(slot, 0, true);
@@ -646,10 +734,33 @@ void Object::HandleAutoCombine(Client* user, const RecipeAutoCombine_Struct* rac
 	user->QueuePacket(outapp);
 	safe_delete(outapp);
 
+	// Custom - Send the augment
+	uint32 augment_id;
+	
+	if (spec.use_augment_system)
+	{
+		std::string query = StringFormat(
+		"SELECT "
+		"id "
+		"FROM "
+		"`items` "
+		"WHERE "
+		"aagi=%i AND acha=%i AND adex=%i AND aint=%i AND asta=%i AND astr=%i AND awis=%i AND hp=%i AND mana=%i AND ac=%i AND damage=%i "
+		"AND name=\"Secret Jewel\"", componentStats["agility"],componentStats["charisma"],componentStats["dexterity"],componentStats["intelligence"],
+		componentStats["stamina"],componentStats["strength"],componentStats["wisdom"],componentStats["hp"],componentStats["mana"],
+		componentStats["ac"],componentStats["damage"]);
+		
+		MySQLRequestResult results = database.QueryDatabase(query);
+	
+		for(auto row = results.begin(); row != results.end(); ++row) 
+		{
+			augment_id = atoi(row[0]);
+		}
+	}
 
 	//now actually try to make something...
 
-	bool success = user->TradeskillExecute(&spec);
+	bool success = user->TradeskillExecute(&spec, augment_id);
 
 	if (success) {
 		if (!spec.has_learnt && ((spec.must_learn & 0x10) != 0x10)) {
@@ -922,7 +1033,7 @@ void Client::SendTradeskillDetails(uint32 recipe_id) {
 }
 
 //returns true on success
-bool Client::TradeskillExecute(DBTradeskillRecipe_Struct *spec) {
+bool Client::TradeskillExecute(DBTradeskillRecipe_Struct *spec, uint32 augment_id) {
 	if(spec == nullptr)
 		return(false);
 
@@ -1060,7 +1171,7 @@ bool Client::TradeskillExecute(DBTradeskillRecipe_Struct *spec) {
 		itr = spec->onsuccess.begin();
 		while(itr != spec->onsuccess.end() && !spec->quest) {
 
-			SummonItem(itr->first, itr->second);
+			SummonItem(itr->first, itr->second, 0, 0, 0, 0, augment_id); // Custom - Set augment into hidden slot
 			item = database.GetItem(itr->first);
 			if (item) {
 				if (GetGroup()) {
@@ -1258,7 +1369,7 @@ bool ZoneDatabase::GetTradeRecipe(
 		return false;
 	}
 
-	std::string query = StringFormat("SELECT tre.recipe_id "
+	std::string query = StringFormat("SELECT tre.recipe_id, tr.use_augment_system "
                                     "FROM tradeskill_recipe_entries AS tre "
                                     "INNER JOIN tradeskill_recipe AS tr ON (tre.recipe_id = tr.id) "
                                     "WHERE tr.enabled AND (( tre.item_id IN(%s) AND tre.componentcount > 0) "
@@ -1295,8 +1406,9 @@ bool ZoneDatabase::GetTradeRecipe(
             }
         }
 
-        query = StringFormat("SELECT tre.recipe_id "
+        query = StringFormat("SELECT tre.recipe_id, tr.use_augment_system "
                             "FROM tradeskill_recipe_entries AS tre "
+							"INNER JOIN tradeskill_recipe AS tr ON (tre.recipe_id = tr.id) "
 							 "WHERE tre.recipe_id IN (%s) "
 							 "GROUP BY tre.recipe_id HAVING sum(tre.componentcount) = %u "
 							 "AND sum(tre.item_id * tre.componentcount) = %u", buf2.c_str(), count, sum
@@ -1327,8 +1439,9 @@ bool ZoneDatabase::GetTradeRecipe(
 		}
 
 		query   = StringFormat(
-			"SELECT tre.recipe_id "
+			"SELECT tre.recipe_id, tr.use_augment_system "
 			"FROM tradeskill_recipe_entries AS tre "
+			"INNER JOIN tradeskill_recipe AS tr ON (tre.recipe_id = tr.id) "
 			"WHERE tre.recipe_id IN (%s) "
 			"AND tre.item_id = %u;", buf2.c_str(), containerId
 		);
@@ -1435,7 +1548,8 @@ bool ZoneDatabase::GetTradeRecipe(
 			tradeskill_recipe.replace_container,
 			tradeskill_recipe.name,
 			tradeskill_recipe.must_learn,
-			tradeskill_recipe.quest
+			tradeskill_recipe.quest,
+			tradeskill_recipe.use_augment_system
 			FROM
 				tradeskill_recipe
 				INNER JOIN tradeskill_recipe_entries ON tradeskill_recipe.id = tradeskill_recipe_entries.recipe_id
@@ -1474,6 +1588,7 @@ bool ZoneDatabase::GetTradeRecipe(
 	spec->has_learnt        = false;
 	spec->madecount         = 0;
 	spec->recipe_id         = recipe_id;
+	spec->use_augment_system = atoi(row[9]) ? true : false;
 
 	auto character_learned_recipe_list = CharacterRecipeListRepository::GetLearnedRecipeList(char_id);
 	auto character_learned_recipe      = CharacterRecipeListRepository::GetRecipe(

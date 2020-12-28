@@ -401,8 +401,8 @@ int32 Mob::mod_kick_damage(int32 dmg)
 	}
 	if (IsClient())
 	{
-		const EQEmu::ItemInstance* itm = nullptr;
-		itm = CastToClient()->GetInv().GetItem(EQEmu::invslot::slotFeet);
+		const EQ::ItemInstance* itm = nullptr;
+		itm = CastToClient()->GetInv().GetItem(EQ::invslot::slotFeet);
 		if (itm)
 			dmg += dmg * (itm->GetItem()->AC / 100.0);
 	}
@@ -426,8 +426,8 @@ int32 Mob::mod_bash_damage(int32 dmg)
 	}
 	if (IsClient())
 	{
-		const EQEmu::ItemInstance* itm = nullptr;
-		itm = CastToClient()->GetInv().GetItem(EQEmu::invslot::slotSecondary);
+		const EQ::ItemInstance* itm = nullptr;
+		itm = CastToClient()->GetInv().GetItem(EQ::invslot::slotSecondary);
 		if (itm)
 			dmg += dmg * (itm->GetItem()->AC / 100.0);
 	}
@@ -455,7 +455,7 @@ int32 Mob::mod_frenzy_damage(int32 dmg)
 
 //Special attack damage after all other bonuses are applied.
 // CUSTOM
-int32 Mob::mod_monk_special_damage(int32 ndamage, EQ::skills::SkillType skill_type
+int32 Mob::mod_monk_special_damage(int32 ndamage, EQ::skills::SkillType skill_type)
 { 
 	if (!(IsClient() || (IsPet() && GetOwner() && GetOwner()->IsClient())))
 	{
@@ -469,19 +469,19 @@ int32 Mob::mod_monk_special_damage(int32 ndamage, EQ::skills::SkillType skill_ty
 	}
 	if (IsClient())
 	{
-		const EQEmu::ItemInstance* itm = nullptr;
+		const EQ::ItemInstance* itm = nullptr;
 		switch (skill_type)
 		{
-			case EQEmu::skills::SkillTigerClaw:
-			case EQEmu::skills::SkillDragonPunch :
-			case EQEmu::skills::SkillEagleStrike:
-				itm = CastToClient()->GetInv().GetItem(EQEmu::invslot::slotHands);
+			case EQ::skills::SkillTigerClaw:
+			case EQ::skills::SkillDragonPunch :
+			case EQ::skills::SkillEagleStrike:
+				itm = CastToClient()->GetInv().GetItem(EQ::invslot::slotHands);
 				if (itm)
 					ndamage += ndamage * (itm->GetItem()->AC / 100.0);
 				break;
-			case EQEmu::skills::SkillFlyingKick:
-			case EQEmu::skills::SkillRoundKick:
-				itm = CastToClient()->GetInv().GetItem(EQEmu::invslot::slotFeet);
+			case EQ::skills::SkillFlyingKick:
+			case EQ::skills::SkillRoundKick:
+				itm = CastToClient()->GetInv().GetItem(EQ::invslot::slotFeet);
 				if (itm)
 					ndamage += ndamage * (itm->GetItem()->AC / 100.0);
 				break;

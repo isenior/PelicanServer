@@ -120,6 +120,7 @@ struct DBTradeskillRecipe_Struct {
 	uint32 madecount;
 	uint32 recipe_id;
 	bool quest;
+	bool use_augment_system;
 };
 
 struct PetRecord {
