@@ -164,7 +164,7 @@ int Mob::mod_effect_value(int effect_value, uint16 spell_id, int effect_type, Mo
 		
 		if (caster && caster->GetClass() == BARD) // Bards are special
 		{
-			bard_bonus = (GetCHA() + GetDEX() - 160)/10;
+			bard_bonus = (caster->GetCHA() + caster->GetDEX() - 160)/10;
 			if (bard_bonus < 0) { bard_bonus = 0;}
 			caster->Message(0,"You're a bard! Bonus: %i", bard_bonus);
 		}
@@ -176,47 +176,47 @@ int Mob::mod_effect_value(int effect_value, uint16 spell_id, int effect_type, Mo
 		{
 			case SE_BardAEDot:
 				Message(0,"Modding SE_BardAEDot: %i", effect_value);
-				if (caster) { Message(0,"Caster: Modding SE_BardAEDot: %i", effect_value); }
+				if (caster) { caster->Message(0,"Caster: Modding SE_BardAEDot: %i", effect_value); }
 				break;
 			case SE_CompleteHeal:
 				Message(0,"Modding SE_CompleteHeal: %i", effect_value);
-				if (caster) { Message(0,"Caster: Modding SE_CompleteHeal: %i", effect_value); }
+				if (caster) { caster->Message(0,"Caster: Modding SE_CompleteHeal: %i", effect_value); }
 				break;
 			case SE_CurrentHP:
 				Message(0,"Modding SE_CurrentHP: %i", effect_value);
-				if (caster) { Message(0,"Caster: Modding SE_CurrentHP: %i", effect_value); }
+				if (caster) { caster->Message(0,"Caster: Modding SE_CurrentHP: %i", effect_value); }
 				break;
 			case SE_CurrentHPOnce:
 				Message(0,"Modding SE_CurrentHPOnce: %i", effect_value);
-				if (caster) { Message(0,"Caster: Modding SE_CurrentHPOnce: %i", effect_value); }
+				if (caster) { caster->Message(0,"Caster: Modding SE_CurrentHPOnce: %i", effect_value); }
 				break;
 			case SE_HealOverTime:
 				Message(0,"Modding SE_HealOverTime: %i", effect_value);
-				if (caster) { Message(0,"Caster: Modding SE_HealOverTime: %i", effect_value); }
+				if (caster) { caster->Message(0,"Caster: Modding SE_HealOverTime: %i", effect_value); }
 				break;
 			case SE_DamageShield:
 				Message(0,"Modding SE_DamageShield: %i", effect_value);
-				if (caster) { Message(0,"Caster: Modding SE_DamageShield: %i", effect_value); }
+				if (caster) { caster->Message(0,"Caster: Modding SE_DamageShield: %i", effect_value); }
 				break;
 			case SE_Rune:
 				Message(0,"Modding SE_Rune: %i", effect_value);
-				if (caster) { Message(0,"Caster: Modding SE_Rune: %i", effect_value); }
+				if (caster) { caster->Message(0,"Caster: Modding SE_Rune: %i", effect_value); }
 				break;
 			case SE_ManaRegen_v2:
 				Message(0,"Modding SE_ManaRegen_v2: %i", effect_value);
-				if (caster) { Message(0,"Caster: Modding SE_ManaRegen_v2: %i", effect_value); }
+				if (caster) { caster->Message(0,"Caster: Modding SE_ManaRegen_v2: %i", effect_value); }
 				break;
 			case SE_CurrentMana:
 				Message(0,"Modding SE_CurrentMana: %i", effect_value);
-				if (caster) { Message(0,"Caster: Modding SE_CurrentMana: %i", effect_value); }
+				if (caster) { caster->Message(0,"Caster: Modding SE_CurrentMana: %i", effect_value); }
 				break;
 			case SE_CurrentManaOnce:
 				Message(0,"Modding SE_CurrentManaOnce: %i", effect_value);
-				if (caster) { Message(0,"Caster: Modding SE_CurrentManaOnce: %i", effect_value); }
+				if (caster) { caster->Message(0,"Caster: Modding SE_CurrentManaOnce: %i", effect_value); }
 				break;
 			default:
 				Message(0,"Modding unknown type: %i", effect_value);
-				if (caster) { Message(0,"Caster: Modding unknown type: %i", effect_value); }
+				if (caster) { caster->Message(0,"Caster: Modding unknown type: %i", effect_value); }
 				break;
 		}
 	}
