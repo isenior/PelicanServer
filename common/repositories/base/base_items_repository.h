@@ -320,6 +320,7 @@ public:
 		int         UNK240;
 		int         UNK241;
 		int         epicitem;
+		int			not_sold_in_stores;
 	};
 
 	static std::string PrimaryKey()
@@ -615,6 +616,7 @@ public:
 			"UNK240",
 			"UNK241",
 			"epicitem",
+			"not_sold_in_stores"
 		};
 	}
 
@@ -950,7 +952,8 @@ public:
 		entry.UNK240              = 0;
 		entry.UNK241              = 0;
 		entry.epicitem            = 0;
-
+		entry.not_sold_in_stores  = 0;
+		
 		return entry;
 	}
 
@@ -1269,6 +1272,7 @@ public:
 			entry.UNK240              = atoi(row[282]);
 			entry.UNK241              = atoi(row[283]);
 			entry.epicitem            = atoi(row[284]);
+			entry.not_sold_in_stores  = atoi(row[285]);
 
 			return entry;
 		}
@@ -1585,6 +1589,7 @@ public:
 		update_values.push_back(columns[282] + " = " + std::to_string(items_entry.UNK240));
 		update_values.push_back(columns[283] + " = " + std::to_string(items_entry.UNK241));
 		update_values.push_back(columns[284] + " = " + std::to_string(items_entry.epicitem));
+		update_values.push_back(columns[285] + " = " + std::to_string(items_entry.not_sold_in_stores));
 
 		auto results = content_db.QueryDatabase(
 			fmt::format(
@@ -1890,6 +1895,7 @@ public:
 		insert_values.push_back(std::to_string(items_entry.UNK240));
 		insert_values.push_back(std::to_string(items_entry.UNK241));
 		insert_values.push_back(std::to_string(items_entry.epicitem));
+		insert_values.push_back(std::to_string(items_entry.not_sold_in_stores));
 
 		auto results = content_db.QueryDatabase(
 			fmt::format(
@@ -2203,6 +2209,7 @@ public:
 			insert_values.push_back(std::to_string(items_entry.UNK240));
 			insert_values.push_back(std::to_string(items_entry.UNK241));
 			insert_values.push_back(std::to_string(items_entry.epicitem));
+			insert_values.push_back(std::to_string(items_entry.not_sold_in_stores));
 
 			insert_chunks.push_back("(" + implode(",", insert_values) + ")");
 		}
@@ -2521,6 +2528,7 @@ public:
 			entry.UNK240              = atoi(row[282]);
 			entry.UNK241              = atoi(row[283]);
 			entry.epicitem            = atoi(row[284]);
+			entry.not_sold_in_stores  = atoi(row[285]);
 
 			all_entries.push_back(entry);
 		}
@@ -2830,6 +2838,7 @@ public:
 			entry.UNK240              = atoi(row[282]);
 			entry.UNK241              = atoi(row[283]);
 			entry.epicitem            = atoi(row[284]);
+			entry.not_sold_in_stores  = atoi(row[285]);
 
 			all_entries.push_back(entry);
 		}

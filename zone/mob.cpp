@@ -4212,6 +4212,8 @@ int32 Mob::GetItemStat(uint32 itemid, const char *identifier)
 		stat = int32(item->Scroll.Level);
 	if (id == "scrolllevel2")
 		stat = int32(item->Scroll.Level2);
+	if (id == "not_sold_in_stores")
+		stat = int32(item->not_sold_in_stores);
 
 	safe_delete(inst);
 	return stat;

@@ -20,6 +20,7 @@
 
 #include <stdlib.h>
 #include <list>
+#include <map>
 
 #ifndef WIN32
 #include <netinet/in.h>	//for htonl
@@ -40,6 +41,64 @@
 extern QueryServ* QServ;
 
 static const EQ::skills::SkillType TradeskillUnknown = EQ::skills::Skill1HBlunt; /* an arbitrary non-tradeskill */
+
+uint32 Object::GetTSAugmentID(std::map<std::string, int> &stats)
+{
+	uint32 augment_id = 200000;
+	uint32 bitmask = 0;
+	uint32 sum = 0;
+	
+	if (stats["strength"] > 0)
+	{
+		bitmask += 1;
+		sum += stats["strength"];
+	}
+	
+	if (stats["intelligence"] > 0)
+	{
+		bitmask += 2;
+		sum += stats["intelligence"];
+	}
+	
+	if (stats["stamina"] > 0)
+	{
+		bitmask += 4;
+		sum += stats["stamina"];
+	}
+	
+	if (stats["wisdom"] > 0)
+	{
+		bitmask += 8;
+		sum += stats["wisdom"];
+	}
+	
+	if (stats["dexterity"] > 0)
+	{
+		bitmask += 16;
+		sum += stats["dexterity"];
+	}
+	
+	if (stats["agility"] > 0)
+	{
+		bitmask += 32;
+		sum += stats["agility"];
+	}
+	
+	if (stats["charisma"] > 0)
+	{
+		bitmask += 64;
+		sum += stats["charisma"];
+	}
+	
+	augment_id += bitmask*1000;
+	if (sum > 999)
+	{
+		sum = 999;
+	}
+	augment_id += sum;
+	
+	return augment_id;
+}
 
 void Object::HandleAugmentation(Client* user, const AugmentItem_Struct* in_augment, Object *worldo)
 {
@@ -463,11 +522,6 @@ void Object::HandleCombine(Client* user, const NewCombine_Struct* in_combine, Ob
 		{"stamina", 0},
 		{"strength", 0},
 		{"wisdom", 0},
-		{"hp", 0},
-		{"mana", 0},
-		{"ac", 0},
-		{"damage", 0},
-		{"delay", 0},
 	};
 	
 	uint32 augment_id;
@@ -485,31 +539,11 @@ void Object::HandleCombine(Client* user, const NewCombine_Struct* in_combine, Ob
 				componentStats["intelligence"] += inst->GetItemInt(true);
 				componentStats["stamina"] += inst->GetItemSta(true);
 				componentStats["strength"] += inst->GetItemStr(true);
-				componentStats["wisdom"] += inst->GetItemWis(true);
-				componentStats["hp"] += inst->GetItemHP(true);
-				componentStats["mana"] += inst->GetItemMana(true);
-				componentStats["ac"] += inst->GetItemArmorClass(true);
-				componentStats["damage"] += inst->GetItemWeaponDamage(true);				
+				componentStats["wisdom"] += inst->GetItemWis(true);			
 			}
 		}
 		
-		std::string query = StringFormat(
-		"SELECT "
-		"id "
-		"FROM "
-		"`items` "
-		"WHERE "
-		"aagi=%i AND acha=%i AND adex=%i AND aint=%i AND asta=%i AND astr=%i AND awis=%i AND hp=%i AND mana=%i AND ac=%i AND damage=%i "
-		"AND name=\"Secret Jewel\"", componentStats["agility"],componentStats["charisma"],componentStats["dexterity"],componentStats["intelligence"],
-		componentStats["stamina"],componentStats["strength"],componentStats["wisdom"],componentStats["hp"],componentStats["mana"],
-		componentStats["ac"],componentStats["damage"]);
-		
-		MySQLRequestResult results = database.QueryDatabase(query);
-	
-		for(auto row = results.begin(); row != results.end(); ++row) 
-		{
-			augment_id = atoi(row[0]);
-		}
+		augment_id = GetTSAugmentID(componentStats);
 	}
 	
 	
@@ -680,11 +714,6 @@ void Object::HandleAutoCombine(Client* user, const RecipeAutoCombine_Struct* rac
 		{"stamina", 0},
 		{"strength", 0},
 		{"wisdom", 0},
-		{"hp", 0},
-		{"mana", 0},
-		{"ac", 0},
-		{"damage", 0},
-		{"delay", 0},
 	};
 
 	//now we know they have everything...
@@ -717,10 +746,6 @@ void Object::HandleAutoCombine(Client* user, const RecipeAutoCombine_Struct* rac
 			componentStats["stamina"] += inst->GetItemSta(true);
 			componentStats["strength"] += inst->GetItemStr(true);
 			componentStats["wisdom"] += inst->GetItemWis(true);
-			componentStats["hp"] += inst->GetItemHP(true);
-			componentStats["mana"] += inst->GetItemMana(true);
-			componentStats["ac"] += inst->GetItemArmorClass(true);
-			componentStats["damage"] += inst->GetItemWeaponDamage(true);	
 
 			if (inst && !inst->IsStackable())
 				user->DeleteItemInInventory(slot, 0, true);
@@ -739,23 +764,7 @@ void Object::HandleAutoCombine(Client* user, const RecipeAutoCombine_Struct* rac
 	
 	if (spec.use_augment_system)
 	{
-		std::string query = StringFormat(
-		"SELECT "
-		"id "
-		"FROM "
-		"`items` "
-		"WHERE "
-		"aagi=%i AND acha=%i AND adex=%i AND aint=%i AND asta=%i AND astr=%i AND awis=%i AND hp=%i AND mana=%i AND ac=%i AND damage=%i "
-		"AND name=\"Secret Jewel\"", componentStats["agility"],componentStats["charisma"],componentStats["dexterity"],componentStats["intelligence"],
-		componentStats["stamina"],componentStats["strength"],componentStats["wisdom"],componentStats["hp"],componentStats["mana"],
-		componentStats["ac"],componentStats["damage"]);
-		
-		MySQLRequestResult results = database.QueryDatabase(query);
-	
-		for(auto row = results.begin(); row != results.end(); ++row) 
-		{
-			augment_id = atoi(row[0]);
-		}
+		augment_id = GetTSAugmentID(componentStats);
 	}
 
 	//now actually try to make something...

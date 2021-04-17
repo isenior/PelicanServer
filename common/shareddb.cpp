@@ -1184,6 +1184,7 @@ void SharedDatabase::LoadItems(void *data, uint32 size, int32 items, uint32 max_
 		item.ScriptFileID = (uint32)atoul(row[ItemField::scriptfileid]);
 		item.ExpendableArrow = (uint16)atoul(row[ItemField::expendablearrow]);
 		item.Clairvoyance = (uint32)atoul(row[ItemField::clairvoyance]);
+		item.not_sold_in_stores = (atoi(row[ItemField::not_sold_in_stores]) == 0) ? false : true;
 
 		strcpy(item.ClickName, row[ItemField::clickname]);
 		strcpy(item.ProcName, row[ItemField::procname]);
@@ -1204,6 +1205,149 @@ const EQ::ItemData *SharedDatabase::GetItem(uint32 id)
 {
 	if (id == 0) {
 		return nullptr;
+	}
+	
+	// Custom If
+	if (id >= 200000)
+	{
+		// Get base augment
+		const EQ::ItemData* base_item = nullptr;
+		base_item = GetItem(147504);
+		
+		EQ::ItemData* item = new EQ::ItemData(*base_item);
+		
+		// Correct the id
+		item->ID = id;
+		
+		// Get the stats to distribute
+		int total_stats = id % 1000;
+		
+		// Get the stats to give value to
+		int stat_mask = (id / 1000) - 200;
+		
+		std::map<std::string, int> stat_values = {};	
+		
+		if ((stat_mask & 1) == 1)
+		{
+			stat_values.insert({"strength", 0});
+		}
+		
+		if ((stat_mask & 2) == 2)
+		{
+			stat_values.insert({"intelligence", 0});
+		}
+		
+		if ((stat_mask & 4) == 4)
+		{
+			stat_values.insert({"stamina", 0});
+		}
+		
+		if ((stat_mask & 8) == 8)
+		{
+			stat_values.insert({"wisdom", 0});
+		}
+		
+		if ((stat_mask & 16) == 16)
+		{
+			stat_values.insert({"dexterity", 0});
+		}
+		
+		if ((stat_mask & 32) == 32)
+		{
+			stat_values.insert({"agility", 0});
+		}
+		
+		if ((stat_mask & 64) == 64)
+		{
+			stat_values.insert({"charisma", 0});
+		}
+		
+		int stat_count = stat_values.size();
+		
+		// No stats to distribute
+		if (stat_count == 0)
+		{
+			return item;
+		}
+		
+		int stats_for_each = total_stats / stat_count;
+		int extra_stats = total_stats % stat_count;
+		
+		for (auto const &ent : stat_values)
+		{
+			stat_values[ent.first] = stats_for_each;
+		}
+		
+		for (int i = 0; i < extra_stats; i++)
+		{
+			if (i == 0)
+			{
+				stat_values["strength"]++;
+			}
+			
+			else if (i == 1)
+			{
+				stat_values["intelligence"]++;
+			}
+			
+			else if (i == 2)
+			{
+				stat_values["stamina"]++;
+			}
+			
+			else if (i == 3)
+			{
+				stat_values["wisdom"]++;
+			}
+			
+			else if (i == 4)
+			{
+				stat_values["dexterity"]++;
+			}
+			
+			else if (i == 5)
+			{
+				stat_values["agility"]++;
+			}
+		}
+		
+		if (stat_values.count("strength") > 0)
+		{
+			item->AStr = stat_values["strength"];
+		}
+		
+		if (stat_values.count("intelligence") > 0)
+		{
+			item->AInt = stat_values["intelligence"];
+		}
+		
+		if (stat_values.count("stamina") > 0)
+		{
+			item->ASta = stat_values["stamina"];
+		}
+		
+		if (stat_values.count("wisdom") > 0)
+		{
+			item->AWis = stat_values["wisdom"];
+		}
+		
+		if (stat_values.count("dexterity") > 0)
+		{
+			item->ADex = stat_values["dexterity"];
+		}
+		
+		if (stat_values.count("agility") > 0)
+		{
+			item->AAgi = stat_values["agility"];
+		}
+		
+		if (stat_values.count("charisma") > 0)
+		{
+			item->ACha = stat_values["charisma"];
+		}
+		
+		return item;
+		
 	}
 
 	if (!items_hash || id > items_hash->max_key()) {

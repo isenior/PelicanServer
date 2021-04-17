@@ -21,6 +21,9 @@ extern WorldServer worldserver;
 
 // Custom
 static const bool isDebug = true;
+static const float defenseMaxBonus = 30;
+static const float defenseScaleRate = 1000;
+static const float defenseBaseBonus = -2;
 
 //All functions that modify a value are passed the value as it was computed by default formulas and bonuses.  In most cases this should be the final value that will be used.
 
@@ -166,7 +169,7 @@ int Mob::mod_effect_value(int effect_value, uint16 spell_id, int effect_type, Mo
 		{
 			bard_bonus = (caster->GetCHA() + caster->GetDEX() - 160)/10;
 			if (bard_bonus < 0) { bard_bonus = 0;}
-			caster->Message(0,"You're a bard! Bonus: %i", bard_bonus);
+			if (isDebug) { caster->Message(0,"You're a bard! Bonus: %i", bard_bonus); }
 		}
 	}
 	
@@ -176,52 +179,87 @@ int Mob::mod_effect_value(int effect_value, uint16 spell_id, int effect_type, Mo
 		{
 			case SE_BardAEDot:
 				Message(0,"Modding SE_BardAEDot: %i", effect_value);
-				if (caster) { caster->Message(0,"Caster: Modding SE_BardAEDot: %i", effect_value); }
+				if (isDebug && caster) { caster->Message(0,"Caster: Modding SE_BardAEDot: %i", effect_value); }
 				break;
 			case SE_CompleteHeal:
 				Message(0,"Modding SE_CompleteHeal: %i", effect_value);
-				if (caster) { caster->Message(0,"Caster: Modding SE_CompleteHeal: %i", effect_value); }
+				if (isDebug && caster) { caster->Message(0,"Caster: Modding SE_CompleteHeal: %i", effect_value); }
 				break;
 			case SE_CurrentHP:
 				Message(0,"Modding SE_CurrentHP: %i", effect_value);
-				if (caster) { caster->Message(0,"Caster: Modding SE_CurrentHP: %i", effect_value); }
+				if (isDebug && caster) { caster->Message(0,"Caster: Modding SE_CurrentHP: %i", effect_value); }
 				break;
 			case SE_CurrentHPOnce:
 				Message(0,"Modding SE_CurrentHPOnce: %i", effect_value);
-				if (caster) { caster->Message(0,"Caster: Modding SE_CurrentHPOnce: %i", effect_value); }
+				if (isDebug && caster) { caster->Message(0,"Caster: Modding SE_CurrentHPOnce: %i", effect_value); }
 				break;
 			case SE_HealOverTime:
 				Message(0,"Modding SE_HealOverTime: %i", effect_value);
-				if (caster) { caster->Message(0,"Caster: Modding SE_HealOverTime: %i", effect_value); }
+				if (isDebug && caster) { caster->Message(0,"Caster: Modding SE_HealOverTime: %i", effect_value); }
 				break;
 			case SE_DamageShield:
 				Message(0,"Modding SE_DamageShield: %i", effect_value);
-				if (caster) { caster->Message(0,"Caster: Modding SE_DamageShield: %i", effect_value); }
+				if (isDebug && caster) { caster->Message(0,"Caster: Modding SE_DamageShield: %i", effect_value); }
 				break;
 			case SE_Rune:
 				Message(0,"Modding SE_Rune: %i", effect_value);
-				if (caster) { caster->Message(0,"Caster: Modding SE_Rune: %i", effect_value); }
+				if (isDebug && caster) { caster->Message(0,"Caster: Modding SE_Rune: %i", effect_value); }
 				break;
 			case SE_ManaRegen_v2:
 				Message(0,"Modding SE_ManaRegen_v2: %i", effect_value);
-				if (caster) { caster->Message(0,"Caster: Modding SE_ManaRegen_v2: %i", effect_value); }
+				if (isDebug && caster) { caster->Message(0,"Caster: Modding SE_ManaRegen_v2: %i", effect_value); }
 				break;
 			case SE_CurrentMana:
 				Message(0,"Modding SE_CurrentMana: %i", effect_value);
-				if (caster) { caster->Message(0,"Caster: Modding SE_CurrentMana: %i", effect_value); }
+				if (isDebug && caster) { caster->Message(0,"Caster: Modding SE_CurrentMana: %i", effect_value); }
 				break;
 			case SE_CurrentManaOnce:
 				Message(0,"Modding SE_CurrentManaOnce: %i", effect_value);
-				if (caster) { caster->Message(0,"Caster: Modding SE_CurrentManaOnce: %i", effect_value); }
+				if (isDebug && caster) { caster->Message(0,"Caster: Modding SE_CurrentManaOnce: %i", effect_value); }
 				break;
 			default:
 				Message(0,"Modding unknown type: %i", effect_value);
-				if (caster) { caster->Message(0,"Caster: Modding unknown type: %i", effect_value); }
+				if (isDebug && caster) { caster->Message(0,"Caster: Modding unknown type: %i", effect_value); }
 				break;
 		}
 	}
+	
+	// Check for spell types that don't require (or want) a caster.
+	// 24 is a regeneration spell
+	if (effect_type == SE_DamageShield || effect_type == SE_Rune || (effect_type == SE_CurrentHP && Mob::GetSpellStat(spell_id, "spell_category") == 24) || 
+		effect_type == SE_ManaRegen_v2 || effect_type == SE_CurrentMana || effect_type == SE_CurrentManaOnce)
+	{
+		if (this->IsClient() || (this->IsPet() && this->GetOwner() && this->GetOwner()->IsClient()))
+		{
+			if (effect_type == SE_DamageShield || effect_type == SE_Rune || (effect_type == SE_CurrentHP && caster == nullptr))
+			{
+				if (effect_value < 0)
+				{
+					effect_value -= bard_bonus;
+				}
+				else
+				{
+					effect_value += bard_bonus;
+					
+				}
+				if (GetSTA() > 80)
+				{
+					effect_value *= (GetSTA() / 80.0);
+				}	
+			}
+			else if (effect_type == SE_ManaRegen_v2 || effect_type == SE_CurrentMana || effect_type == SE_CurrentManaOnce) // Mana regen based on target's int
+			{
+				effect_value += bard_bonus;
+				if (GetINT() > 80)
+				{
+					effect_value *= (GetINT() / 80.0);
+				}
+			}
+		}
+	}
+	
 	// Spell effects that require a caster
-	if (caster && (caster->IsClient() || (caster->IsPet() && caster->GetOwner() && caster->GetOwner()->IsClient())))
+	else if (caster && (caster->IsClient() || (caster->IsPet() && caster->GetOwner() && caster->GetOwner()->IsClient())))
 	{		
 		// Damage or healing spell
 		if (effect_type == SE_BardAEDot || effect_type == SE_CompleteHeal ||
@@ -248,40 +286,11 @@ int Mob::mod_effect_value(int effect_value, uint16 spell_id, int effect_type, Mo
 			}
 		}
 	}
-	// Damage shields and runes are based on the target and not the caster
-	if (this->IsClient() || (this->IsPet() && this->GetOwner() && this->GetOwner()->IsClient()))
-	{
-		// SE_CurrentHP will only trigger without a caster on the first tick of a regen buff
-		if (effect_type == SE_DamageShield || effect_type == SE_Rune || (effect_type == SE_CurrentHP && caster == nullptr))
-		{
-			if (effect_value < 0)
-			{
-				effect_value -= bard_bonus;
-			}
-			else
-			{
-				effect_value += bard_bonus;
-				
-			}
-			if (GetSTA() > 80)
-			{
-				effect_value *= (GetSTA() / 80.0);
-			}	
-		}
-		else if (effect_type == SE_ManaRegen_v2 || effect_type == SE_CurrentMana || effect_type == SE_CurrentManaOnce) // Mana regen based on target's int
-		{
-			effect_value += bard_bonus;
-			if (GetINT() > 80)
-			{
-				effect_value *= (GetINT() / 80.0);
-			}
-		}
-	}
 	
 	if (isDebug)
 	{
-		if (caster) { caster->Message(0,"Caster - Modded effect value: %i", effect_value); }
-		Message(0,"Modded effect value: %i", effect_value);
+		if (isDebug && caster) { caster->Message(0,"Caster - Modded effect value: %i", effect_value); }
+		if (isDebug) { Message(0,"Modded effect value: %i", effect_value); }
 	}
 	return(effect_value); 
 }
@@ -301,7 +310,7 @@ float Mob::mod_riposte_chance(float ripostechance, Mob* attacker)
 	int agi = GetAGI();
 	if (agi > 80)
 	{
-		ripostechance += logf(agi - 80) / logf(5);
+		ripostechance += (agi*defenseMaxBonus)/(agi+defenseScaleRate)+defenseBaseBonus;
 	}
 	if (isDebug) { Message(0,"Modded riposte chance: %.2f", ripostechance); }
 	return(ripostechance); 
@@ -319,7 +328,7 @@ float Mob::mod_block_chance(float blockchance, Mob* attacker)
 	int agi = GetAGI();
 	if (agi > 80)
 	{
-		blockchance += logf(agi - 80) / logf(5);
+		blockchance += (agi*defenseMaxBonus)/(agi+defenseScaleRate)+defenseBaseBonus;
 	}
 	if (isDebug) { Message(0,"Modded block chance: %.2f", blockchance); }
 	return(blockchance); 
@@ -337,7 +346,7 @@ float Mob::mod_parry_chance(float parrychance, Mob* attacker)
 	int agi = GetAGI();
 	if (agi > 80)
 	{
-		parrychance += logf(agi - 80) / logf(5);
+		parrychance += (agi*defenseMaxBonus)/(agi+defenseScaleRate)+defenseBaseBonus;
 	}
 	if (isDebug) { Message(0,"Modded parry chance: %.2f", parrychance); }
 	return(parrychance); 
@@ -355,7 +364,7 @@ float Mob::mod_dodge_chance(float dodgechance, Mob* attacker)
 	int agi = GetAGI();
 	if (agi > 80)
 	{
-		dodgechance += logf(agi - 80) / logf(5);
+		dodgechance += (agi*defenseMaxBonus)/(agi+defenseScaleRate)+defenseBaseBonus;
 	}
 	if (isDebug) { Message(0,"Modded dodge chance: %.2f", dodgechance); }
 	return(dodgechance); 

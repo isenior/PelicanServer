@@ -13206,8 +13206,9 @@ void Client::Handle_OP_ShopPlayerSell(const EQApplicationPacket *app)
 	if (charges == 0 && item->ItemType != 11 && item->ItemType != 17 && item->ItemType != 19 && item->ItemType != 21)
 		charges = 1;
 
+	bool keep_item = !item->not_sold_in_stores;
 	int freeslot = 0;
-	if (charges > 0 && (freeslot = zone->SaveTempItem(vendor->CastToNPC()->MerchantType, vendor->GetNPCTypeID(), itemid, charges, true)) > 0) {
+	if (keep_item && charges > 0 && (freeslot = zone->SaveTempItem(vendor->CastToNPC()->MerchantType, vendor->GetNPCTypeID(), itemid, charges, true)) > 0) {
 		EQ::ItemInstance* inst2 = inst->Clone();
 
 		while (true) {
@@ -13296,7 +13297,7 @@ void Client::Handle_OP_ShopPlayerSell(const EQApplicationPacket *app)
 	//This forces the price to show up correctly for charged items.
 	if (inst->IsCharged())
 		mp->quantity = 1;
-
+	
 	auto outapp = new EQApplicationPacket(OP_ShopPlayerSell, sizeof(Merchant_Purchase_Struct));
 	Merchant_Purchase_Struct* mco = (Merchant_Purchase_Struct*)outapp->pBuffer;
 	mco->npcid = vendor->GetID();
