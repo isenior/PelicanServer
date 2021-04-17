@@ -482,7 +482,7 @@ public:
 	void	SendGroupJoin(uint32 gid, const char *name);
 
 	void	SaveAllClientsTaskState();
-	void	ReloadAllClientsTaskState(int TaskID=0);
+	void	ReloadAllClientsTaskState(int task_id=0);
 	uint16	CreateGroundObject(uint32 itemid, const glm::vec4& position, uint32 decay_time = 300000);
 	uint16	CreateGroundObjectFromModel(const char *model, const glm::vec4& position, uint8 type = 0x00, uint32 decay_time = 0);
 	uint16	CreateDoor(const char *model, const glm::vec4& position, uint8 type = 0, uint16 size = 100);
@@ -536,6 +536,8 @@ public:
 	bool IsTrapGroupSpawned(uint32 trap_id, uint8 group);
 	void UpdateAllTraps(bool respawn, bool repopnow = false);
 	void ClearTrapPointers();
+
+	int MovePlayerCorpsesToGraveyard(bool force_move_from_instance = false);
 
 protected:
 	friend class Zone;
