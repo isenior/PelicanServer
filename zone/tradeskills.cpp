@@ -894,7 +894,7 @@ void Client::SendTradeskillSearchResults(
 
 	for (auto row = results.begin(); row != results.end(); ++row) {
 		if (row == nullptr || row[0] == nullptr || row[1] == nullptr || row[2] == nullptr || row[3] == nullptr ||
-			row[5] == nullptr) {
+			row[4] == nullptr || row[6] == nullptr) {
 			continue;
 		}
 
@@ -902,7 +902,8 @@ void Client::SendTradeskillSearchResults(
 		const char *name      = row[1];
 		uint32     trivial    = (uint32) atoi(row[2]);
 		uint32     comp_count = (uint32) atoi(row[3]);
-		uint32     tradeskill = (uint16) atoi(row[5]);
+		uint8      must_learn = (uint8) atoi(row[4]);
+		uint32     tradeskill = (uint16) atoi(row[6]);
 
 		// Skip the recipes that exceed the threshold in skill difference
 		// Recipes that have either been made before or were
@@ -922,6 +923,20 @@ void Client::SendTradeskillSearchResults(
 				continue;
 			}
 		}
+		
+		// Note: I replaced this by fixing the query. Leaving here in case I later find bugs in modififying query
+		// Custom, if it must be learned, don't show it unless they know it
+        // if ((must_learn & 0x02) == 0x02)
+        // {
+			// auto character_learned_recipe = CharacterRecipeListRepository::GetRecipe(
+				// character_learned_recipe_list,
+				// recipe_id);
+
+			// if (character_learned_recipe.made_count == 0)
+			// {
+				// continue;
+			// }
+        // }
 
 		auto               outapp = new EQApplicationPacket(OP_RecipeReply, sizeof(RecipeReply_Struct));
 		RecipeReply_Struct *reply = (RecipeReply_Struct *) outapp->pBuffer;

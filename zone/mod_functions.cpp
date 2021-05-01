@@ -20,7 +20,7 @@ extern Zone* zone;
 extern WorldServer worldserver;
 
 // Custom
-static const bool isDebug = true;
+static const bool isDebug = false;
 static const float defenseMaxBonus = 30;
 static const float defenseScaleRate = 1000;
 static const float defenseBaseBonus = -2;

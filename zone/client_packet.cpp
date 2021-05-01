@@ -12078,6 +12078,7 @@ void Client::Handle_OP_RecipesFavorite(const EQApplicationPacket *app)
 			tr.name,
 			tr.trivial,
 			SUM(tre.componentcount),
+			tr.must_learn,
 			tr.tradeskill
 				FROM
 				tradeskill_recipe AS tr
@@ -12178,6 +12179,7 @@ void Client::Handle_OP_RecipesSearch(const EQApplicationPacket *app)
 			tr.name,
 			tr.trivial,
 			SUM(tre.componentcount),
+			tr.must_learn,
 			tr.tradeskill
 				FROM
 				tradeskill_recipe AS tr
@@ -12186,6 +12188,7 @@ void Client::Handle_OP_RecipesSearch(const EQApplicationPacket *app)
 				{} tr.trivial >= {}
 				AND tr.trivial <= {}
 				AND tr.enabled <> 0
+				AND NOT (tr.must_learn & 0x02 = 0x02 AND NOT EXISTS (SELECT * FROM char_recipe_list AS crl WHERE crl.recipe_id = tr.id AND crl.char_id = {}))
 				AND tr.must_learn & 0x20 <> 0x20
 				AND (
 					(
@@ -12213,6 +12216,7 @@ void Client::Handle_OP_RecipesSearch(const EQApplicationPacket *app)
 		search_clause,
 		p_recipes_search_struct->mintrivial,
 		p_recipes_search_struct->maxtrivial,
+		CharacterID(),
 		ContentFilterCriteria::apply(),
 		containers_where_clause,
 		combine_object_slots

@@ -1208,11 +1208,16 @@ const EQ::ItemData *SharedDatabase::GetItem(uint32 id)
 	}
 	
 	// Custom If
-	if (id >= 200000)
+	if (id >= 200000 && id < 600000)
 	{
 		// Get base augment
 		const EQ::ItemData* base_item = nullptr;
 		base_item = GetItem(147504);
+		
+		if (base_item == nullptr) 
+		{
+			return nullptr;
+		}
 		
 		EQ::ItemData* item = new EQ::ItemData(*base_item);
 		
@@ -1272,6 +1277,12 @@ const EQ::ItemData *SharedDatabase::GetItem(uint32 id)
 		
 		int stats_for_each = total_stats / stat_count;
 		int extra_stats = total_stats % stat_count;
+		
+		if (stats_for_each >= 127)
+		{
+			stats_for_each = 127;
+			extra_stats = 0;
+		}
 		
 		for (auto const &ent : stat_values)
 		{
